@@ -452,7 +452,8 @@ return {
 
       async function submit() {
         const blockIndex = firstTextBlockIndex(data.content);
-        if (blockIndex === -1 || draft.trim() === '' || draft === text) { setEditing(false); return; }
+        // An unchanged draft is still a resend: it branches and regenerates.
+        if (blockIndex === -1 || draft.trim() === '') { setEditing(false); return; }
         setBusy(true);
         setError(null);
         try {
