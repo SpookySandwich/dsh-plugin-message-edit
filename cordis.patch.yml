@@ -1,0 +1,5 @@
+# dsh-plugin-message-tree: host half owns the /message-tree route that builds
+# version branches; the client half renders the edit UI and the tree view.
+- insert:
+    - id: message-tree
+      name: dsh-plugin-message-tree

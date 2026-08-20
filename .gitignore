@@ -1,0 +1,3 @@
+node_modules/
+lib/client.js
+*.tgz
