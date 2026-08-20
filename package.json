@@ -26,6 +26,9 @@
     "deepseek-harness",
     "cordis-plugin"
   ],
+  "scripts": {
+    "test": "node test/tree.test.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

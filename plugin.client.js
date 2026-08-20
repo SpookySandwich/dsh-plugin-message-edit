@@ -87,17 +87,33 @@ function ringFor(versions, sessionId, turn) {
     if (!parent) break;
     cursor = parent;
   }
-  let anchor = cursor;
-  let current = cursor;
-  if (typeof cursor.targetTurn === 'number' && cursor.targetTurn === turn && cursor.parentSessionId) {
-    const parent = byId.get(cursor.parentSessionId);
-    if (parent) anchor = parent;
+  let fork = cursor;
+  while (fork.parentSessionId && typeof fork.targetTurn === 'number' && fork.targetTurn === turn) {
+    const parent = byId.get(fork.parentSessionId);
+    if (!parent) break;
+    fork = parent;
   }
-  const alternatives = [anchor].concat(versions
-    .filter(function (v) { return v.parentSessionId === anchor.sessionId && v.targetTurn === turn; })
-    .sort(function (a, b) { return a.createdAt - b.createdAt; }));
+  function walksToFork(start) {
+    let x = start;
+    const seen = new Set();
+    while (x && !seen.has(x.sessionId)) {
+      seen.add(x.sessionId);
+      if (x.sessionId === fork.sessionId) return true;
+      if (typeof x.targetTurn !== 'number' || x.targetTurn !== turn) return false;
+      x = x.parentSessionId ? byId.get(x.parentSessionId) : null;
+    }
+    return false;
+  }
+  const alternatives = versions
+    .filter(function (v) {
+      return v.sessionId === fork.sessionId || (v.targetTurn === turn && walksToFork(v));
+    })
+    .sort(function (a, b) {
+      return a.createdAt - b.createdAt || String(a.sessionId).localeCompare(String(b.sessionId));
+    });
   if (alternatives.length < 2) return null;
-  let index = alternatives.findIndex(function (v) { return v.sessionId === current.sessionId; });
+  let index = alternatives.findIndex(function (v) { return v.sessionId === cursor.sessionId; });
+  if (index === -1) index = alternatives.findIndex(function (v) { return v.sessionId === sessionId; });
   if (index === -1) index = 0;
   return { alternatives: alternatives, index: index };
 }
