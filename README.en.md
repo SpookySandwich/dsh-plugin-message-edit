@@ -7,7 +7,7 @@ ChatGPT-style message editing for DeepSeek Harness: hover any prompt you sent, c
 - **Edit in place**: hover your message → pencil → revise → Send. The new branch regenerates from the full context before that turn, with your edited prompt.
 - **Version switching**: when a message has multiple versions, a `‹ 2/3 ›` control appears under the bubble to flip between them.
 - **Versions view**: a new "Versions" tab above the conversation draws the whole branch tree — the current path is highlighted, and clicking any node jumps to it.
-- **Durable**: every branch is a real session; version links are written as persistent events and survive restarts.
+- **Durable**: every branch is a real session; version links are written as persistent events and survive restarts. Branches stay off the left session list — 21 edits still look like one conversation. Switch versions with `‹ ›` or the Versions tab.
 
 ## Install
 
