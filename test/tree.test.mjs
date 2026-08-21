@@ -102,6 +102,44 @@ check('a parent cycle terminates instead of hanging',
 const orphan = [node('P', 'GONE', 1)];
 check('a dangling parent stops at the visible node', rootOf(orphan, 'P'), 'P');
 
+
+/* ---- deletion holes ----------------------------------------------------- */
+// Versions are ordinary sidebar sessions now, so the user can delete one.
+// The host tree() only ever returns SURVIVING sessions (dsh traceSession
+// rebuilds the family from surviving headers), so these model deletion by
+// simply omitting the deleted node from the versions list.
+
+// 10 same-turn siblings: root A plus versions V2..V10 all hang off A.
+const ten = [{ sessionId: 'A', createdAt: 1 }];
+for (let i = 2; i <= 10; i++) ten.push({ sessionId: 'V' + i, parentSessionId: 'A', targetTurn: 1, createdAt: i });
+
+// Delete V5 (a middle sibling). Viewing V6: ring must renumber to 9 with no gap.
+const afterDelete = ten.filter((v) => v.sessionId !== 'V5');
+const ringAfter = ringFor(afterDelete, 'V6', 1);
+check('deleting a sibling renumbers the ring instead of breaking it', {
+  n: ringAfter.alternatives.length,
+  hasHole: ringAfter.alternatives.some((v) => v.sessionId === 'V5'),
+  index: ringAfter.index,
+}, { n: 9, hasHole: false, index: 4 });
+
+// Delete the fork original A itself. Siblings can no longer reach the fork:
+// the ring disappears (null) rather than crashing.
+const noRoot = ten.filter((v) => v.sessionId !== 'A');
+check('deleting the fork original degrades to no ring, not a crash',
+  ringFor(noRoot, 'V6', 1), null);
+
+// Chain: A -> B (edit turn 1) -> C (edit turn 2 made from B). Delete B.
+// From C, the walk up hits the hole and stops; turn-1 ring vanishes cleanly.
+const chain = [
+  { sessionId: 'A', createdAt: 1 },
+  { sessionId: 'C', parentSessionId: 'B', targetTurn: 2, createdAt: 3 },
+];
+check('a hole in the parent chain yields no ring, not a crash',
+  ringFor(chain, 'C', 1), null);
+
+// rootOf across the same hole must terminate at the last visible node.
+check('rootOf stops at the hole instead of crashing', rootOf(chain, 'C'), 'C');
+
 console.log(`
 ${failed === 0 ? 'all passed' : failed + ' failed'}`);
 process.exit(failed === 0 ? 0 : 1);
