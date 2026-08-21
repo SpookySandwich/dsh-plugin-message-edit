@@ -68,6 +68,139 @@ function syncStyleAttribute() {
   if (root) root.setAttribute('data-mtx-style', styleStore.get());
 }
 
+/* ----------------------------------------------------------- active path -- */
+
+// A version IS a whole session, so "which version am I looking at" is just
+// "which session is open". Reopening a conversation lands on whichever session
+// the sidebar points at — normally the family root — so a branch you had
+// selected is silently dropped and the ring snaps back to 1/N.
+//
+// Remember the last session viewed for each family, keyed by the family's root,
+// and restore it when you land back on that root. Recording happens for every
+// family member you view, so walking the ring back to the root records the root
+// and the restore then correctly does nothing (no ping-pong).
+const PATH_KEY = 'dsh-plugin-message-tree:active-path';
+const PATH_LIMIT = 200;
+
+const activePathStore = {
+  map: null,
+  read() {
+    if (this.map === null) {
+      let parsed = null;
+      try {
+        const g = realGlobal();
+        const raw = g && g.localStorage && g.localStorage.getItem(PATH_KEY);
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch (e) {}
+      this.map = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    }
+    return this.map;
+  },
+  get(rootId) {
+    if (!rootId) return undefined;
+    const v = this.read()[rootId];
+    return typeof v === 'string' ? v : undefined;
+  },
+  set(rootId, sessionId) {
+    if (!rootId || !sessionId) return;
+    const map = this.read();
+    if (map[rootId] === sessionId) return;
+    map[rootId] = sessionId;
+    // Bound the map so a long-lived profile cannot grow it without limit.
+    // Object key order is insertion order for string keys, so the oldest
+    // entries are at the front.
+    const keys = Object.keys(map);
+    if (keys.length > PATH_LIMIT) {
+      for (let i = 0; i < keys.length - PATH_LIMIT; i++) delete map[keys[i]];
+    }
+    try {
+      const g = realGlobal();
+      if (g && g.localStorage) g.localStorage.setItem(PATH_KEY, JSON.stringify(map));
+    } catch (e) {}
+  },
+};
+
+/** The family root for `sessionId`: walk parents until one has none. */
+function rootOf(versions, sessionId) {
+  if (!versions || sessionId === undefined) return undefined;
+  const byId = new Map(versions.map(function (v) { return [v.sessionId, v]; }));
+  let cursor = byId.get(sessionId);
+  if (!cursor) return undefined;
+  const seen = new Set();
+  while (cursor.parentSessionId && !seen.has(cursor.sessionId)) {
+    seen.add(cursor.sessionId);
+    const parent = byId.get(cursor.parentSessionId);
+    if (!parent) break;
+    cursor = parent;
+  }
+  return cursor.sessionId;
+}
+
+// Families already restored in this page load. Without this the restore would
+// re-fire on every re-render and fight a deliberate walk back to the root.
+const restoredFamilies = new Set();
+// Restores that have been triggered but whose navigation has not landed yet.
+// While a root is in here we must not record it as the selection.
+const pendingRestore = new Set();
+
+/* --------------------------------------------------------------- prefs -- */
+
+// Behaviour toggles, persisted next to the style choice. Both default to the
+// behaviour the user asked for rather than the old one.
+const PREFS_KEY = 'dsh-plugin-message-tree:prefs';
+const PREFS_DEFAULTS = {
+  // Restore the last-viewed branch when reopening a conversation.
+  rememberPath: true,
+  // Cancel a still-running turn before an edit forks the conversation.
+  stopOnEdit: true,
+};
+
+const prefsStore = {
+  value: null,
+  listeners: [],
+  get() {
+    if (this.value === null) {
+      let parsed = null;
+      try {
+        const g = realGlobal();
+        const raw = g && g.localStorage && g.localStorage.getItem(PREFS_KEY);
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch (e) {}
+      const out = {};
+      for (const k in PREFS_DEFAULTS) {
+        out[k] = parsed && typeof parsed[k] === 'boolean' ? parsed[k] : PREFS_DEFAULTS[k];
+      }
+      this.value = out;
+    }
+    return this.value;
+  },
+  set(patch) {
+    const next = Object.assign({}, this.get(), patch);
+    this.value = next;
+    try {
+      const g = realGlobal();
+      if (g && g.localStorage) g.localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+    } catch (e) {}
+    for (let i = 0; i < this.listeners.length; i++) {
+      try { this.listeners[i](); } catch (e) {}
+    }
+  },
+  subscribe(fn) {
+    const listeners = this.listeners;
+    listeners.push(fn);
+    return function () {
+      const at = listeners.indexOf(fn);
+      if (at !== -1) listeners.splice(at, 1);
+    };
+  },
+};
+
+function usePrefs() {
+  const [, force] = React.useReducer(function (x) { return x + 1; }, 0);
+  React.useEffect(function () { return prefsStore.subscribe(force); }, []);
+  return prefsStore.get();
+}
+
 function useStyle() {
   const [, force] = React.useReducer(function (x) { return x + 1; }, 0);
   React.useEffect(function () { return styleStore.subscribe(force); }, []);
@@ -490,6 +623,10 @@ return {
         styleDesc_chatgpt: 'Copy and edit under the bubble, revealed on hover. Cancel and Send sit inside the editor.',
         styleDesc_deepseek: 'Copy and edit under the bubble, always visible — closest to DSH itself. Cancel and Send sit inside the editor.',
         styleDesc_claude: 'Retry, edit and copy under the bubble, revealed on hover. Cancel and Save sit below the editor.',
+        rememberPathLabel: 'Remember the version I was viewing',
+        rememberPathHint: 'Reopening a conversation returns to the branch you last had open instead of the original. Off means it always opens the first version.',
+        stopOnEditLabel: 'Stop the running reply when I edit',
+        stopOnEditHint: 'Editing a message cancels the reply still being generated before branching, so the superseded answer stops spending tokens. This also lets you edit mid-reply. Off leaves it running.',
         previewUser: 'Rewrite this paragraph to be more concise.',
       },
       zh: {
@@ -519,6 +656,10 @@ return {
         styleDesc_chatgpt: '气泡下方为复制与编辑，悬停时显示；「取消 / 发送」位于编辑框内部。',
         styleDesc_deepseek: '气泡下方为复制与编辑，始终显示——最接近 DSH 原生；「取消 / 发送」位于编辑框内部。',
         styleDesc_claude: '气泡下方为重试、编辑与复制，悬停时显示；「取消 / 保存」位于编辑框下方。',
+        rememberPathLabel: '记住我正在查看的版本',
+        rememberPathHint: '重新打开会话时回到上次查看的分支，而不是最初那条。关闭后始终打开第一个版本。',
+        stopOnEditLabel: '编辑时中止正在生成的回复',
+        stopOnEditHint: '编辑消息时，先取消仍在生成的那条回复再分支，避免被取代的回答继续消耗额度；同时允许在回复过程中直接编辑。关闭后旧回复会继续跑完。',
         previewUser: '把这段话改写得更简洁一些。',
       },
     };
@@ -605,13 +746,53 @@ return {
       const tree = useTree(sessionId);
       const ring = typeof turn === 'number' ? ringFor(tree && tree.versions, sessionId, turn) : null;
 
+      // Remember which branch of this family is open, and restore it when we
+      // land back on the family root. Runs per bubble, so every step is either
+      // idempotent or guarded — see activePathStore.
+      const versions = tree && tree.versions;
+      const prefs = usePrefs();
+      React.useEffect(function () {
+        if (!prefs.rememberPath) return;
+        if (!versions || sessionId === undefined) return;
+        const root = rootOf(versions, sessionId);
+        if (!root) return;
+        if (sessionId !== root) {
+          // Arrived at a branch: that is now the remembered view, and any
+          // restore we kicked off has landed.
+          pendingRestore.delete(root);
+          activePathStore.set(root, sessionId);
+          return;
+        }
+        // On the root. Don't record while a restore we triggered is still in
+        // flight, or we would overwrite the target with the root we are leaving.
+        if (pendingRestore.has(root)) return;
+        const remembered = activePathStore.get(root);
+        if (!remembered || remembered === root) return;
+        if (restoredFamilies.has(root)) {
+          // Already restored once this page load and the user walked back to
+          // the root deliberately — honour that as the new selection.
+          activePathStore.set(root, root);
+          return;
+        }
+        // Never chase a branch that no longer exists.
+        if (!versions.some(function (v) { return v.sessionId === remembered; })) return;
+        restoredFamilies.add(root);
+        pendingRestore.add(root);
+        if (sessions) openWhenListed(sessions, remembered);
+      }, [versions, sessionId, sessions, prefs.rememberPath]);
+
       const [editing, setEditing] = React.useState(false);
       const [draft, setDraft] = React.useState('');
       const [busy, setBusy] = React.useState(false);
       const [error, setError] = React.useState(null);
       const [copied, setCopied] = React.useState(false);
 
-      const canEdit = !running && sessionId !== undefined && typeof turn === 'number' && text !== '' && !editing;
+      // Editing used to require an idle session, because forking calls
+      // `runMaintenance`, which throws while a turn is live. With stopOnEdit the
+      // host cancels that turn first, so editing mid-answer is allowed — and is
+      // the point: it stops the superseded turn instead of leaving it streaming.
+      const canEdit = (!running || prefs.stopOnEdit)
+        && sessionId !== undefined && typeof turn === 'number' && text !== '' && !editing;
 
       function beginEdit() {
         setDraft(text);
@@ -632,6 +813,7 @@ return {
             eventSeq: data.seq,
             blockIndex: blockIndex,
             text: draft,
+            stopPrevious: prefs.stopOnEdit,
           });
           treeStore.invalidate();
           setEditing(false);
@@ -647,7 +829,9 @@ return {
         setBusy(true);
         setError(null);
         try {
-          const result = await mutate({ action: 'retry', sessionId: sessionId, turn: turn });
+          const result = await mutate({
+            action: 'retry', sessionId: sessionId, turn: turn, stopPrevious: prefs.stopOnEdit,
+          });
           treeStore.invalidate();
           if (sessions) openWhenListed(sessions, result.sessionId);
         } catch (e) {
@@ -1019,8 +1203,21 @@ return {
 
     // Settings: pick the edit-interface style, with a live preview that
     // renders in the currently-selected look.
+    function Toggle(props) {
+      return React.createElement(React.Fragment, null,
+        React.createElement('div', { className: 'mtx-set-row' },
+          React.createElement('span', { className: 'mtx-set-label' }, props.label),
+          React.createElement('input', {
+            type: 'checkbox', checked: props.checked, onChange: props.onChange,
+          })
+        ),
+        React.createElement('div', { className: 'mtx-set-hint' }, props.hint)
+      );
+    }
+
     function StyleSettings() {
       const style = useStyle();
+      const prefs = usePrefs();
       return React.createElement('div', { className: 'mtx-set' },
         React.createElement('div', { className: 'mtx-set-row' },
           React.createElement('span', { className: 'mtx-set-label' }, t('styleLabel')),
@@ -1034,6 +1231,18 @@ return {
           )
         ),
         React.createElement('div', { className: 'mtx-set-hint' }, t('styleDesc_' + style)),
+        React.createElement(Toggle, {
+          label: t('rememberPathLabel'),
+          hint: t('rememberPathHint'),
+          checked: prefs.rememberPath,
+          onChange: function (e) { prefsStore.set({ rememberPath: e.target.checked }); },
+        }),
+        React.createElement(Toggle, {
+          label: t('stopOnEditLabel'),
+          hint: t('stopOnEditHint'),
+          checked: prefs.stopOnEdit,
+          onChange: function (e) { prefsStore.set({ stopOnEdit: e.target.checked }); },
+        }),
         React.createElement('div', { className: 'mtx-preview' },
           React.createElement('div', { className: 'mtx-row' },
             React.createElement('div', { className: 'mtx-line' },

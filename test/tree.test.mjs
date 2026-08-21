@@ -1,4 +1,4 @@
-import { attachParentId, ringFor } from '../lib/tree-logic.js';
+import { attachParentId, ringFor, rootOf } from '../lib/tree-logic.js';
 
 function node(id, parentSessionId, targetTurn) {
   return { sessionId: id, parentSessionId, targetTurn, createdAt: 0 };
@@ -70,5 +70,38 @@ check('turn 1 ring while viewing a turn-2 child still sees A/B', {
   n: ringTurn1OnE.alternatives.length,
 }, { ids: ['A', 'B'], n: 2 });
 
-console.log(`\n${failed === 0 ? 'all passed' : failed + ' failed'}`);
+/* ---- active path: family root resolution ------------------------------- */
+// The remembered "which version was I viewing" is keyed by the family root, so
+// every branch of one conversation must agree on that key.
+
+const family = [
+  node('A', undefined, undefined),
+  node('B', 'A', 1),
+  node('C', 'A', 1),
+  node('D', 'C', 2),
+];
+
+check('root of the root is itself', rootOf(family, 'A'), 'A');
+check('root of a direct branch is the root', rootOf(family, 'B'), 'A');
+check('root of a nested branch is still the root', rootOf(family, 'D'), 'A');
+check('every branch agrees on one key',
+  [...new Set(family.map((v) => rootOf(family, v.sessionId)))], ['A']);
+check('unknown session has no root', rootOf(family, 'ZZ'), undefined);
+check('missing versions has no root', rootOf(null, 'A'), undefined);
+
+// A broken parent link must not hang the walk.
+const cyclic = [
+  { sessionId: 'X', parentSessionId: 'Y', targetTurn: 1, createdAt: 0 },
+  { sessionId: 'Y', parentSessionId: 'X', targetTurn: 1, createdAt: 0 },
+];
+check('a parent cycle terminates instead of hanging',
+  typeof rootOf(cyclic, 'X'), 'string');
+
+// A parent that is not in the list (e.g. a deleted session) stops the walk at
+// the last node we can actually see, rather than returning undefined.
+const orphan = [node('P', 'GONE', 1)];
+check('a dangling parent stops at the visible node', rootOf(orphan, 'P'), 'P');
+
+console.log(`
+${failed === 0 ? 'all passed' : failed + ' failed'}`);
 process.exit(failed === 0 ? 0 : 1);

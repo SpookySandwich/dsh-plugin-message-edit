@@ -35,7 +35,8 @@
     "version-tree"
   ],
   "scripts": {
-    "test": "node test/tree.test.mjs"
+    "build": "node scripts/build-client.mjs",
+    "test": "node scripts/build-client.mjs --check && node test/tree.test.mjs"
   },
   "dsh": {
     "bundle": {
