@@ -1,12 +1,16 @@
 {
-  "name": "dsh-plugin-message-tree",
+  "name": "dsh-plugin-message-edit",
   "version": "0.1.0",
-  "description": "ChatGPT-style message editing for DeepSeek Harness: edit a past prompt to branch the conversation, switch versions with ‹ › arrows, and see the whole version tree in one view.",
+  "description": "ChatGPT-style message editing for DeepSeek Harness: edit a past prompt to rewind and branch the conversation, switch versions with a counter under the bubble, and see every branch in a version tree. Choose the ChatGPT, DeepSeek or Claude control layout.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
-    ".": { "default": "./lib/index.js" },
-    "./client": { "default": "./lib/client.js" },
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -18,13 +22,17 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SpookySandwich/dsh-plugin-message-tree.git"
+    "url": "git+https://github.com/SpookySandwich/dsh-plugin-message-edit.git"
   },
   "keywords": [
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
-    "cordis-plugin"
+    "cordis-plugin",
+    "message-edit",
+    "edit",
+    "branch",
+    "version-tree"
   ],
   "scripts": {
     "test": "node test/tree.test.mjs"

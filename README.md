@@ -1,14 +1,14 @@
-# dsh-plugin-message-tree
+# dsh-plugin-message-edit
 
 [English](README.en.md) | 简体中文
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.1.0--rc.7-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
-[![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-tree?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-tree/stargazers)
+[![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 编辑一条已经发出的消息，对话会从那一刻 **真正回溯并分叉**——和 ChatGPT、Claude、DeepSeek 的做法一致。旧版本不会被覆盖：气泡下方出现 `‹ 2/4 ›` 计数，「版本」标签页则画出整棵树。
 
-![演示](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-tree/master/assets/demo-zh.gif)
+![演示](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-edit/master/assets/demo-zh.gif)
 
 ## 功能
 
@@ -34,7 +34,7 @@
 ## 安装
 
 ```bash
-dsh plugin --profile web add dsh-plugin-message-tree
+dsh plugin --profile web add dsh-plugin-message-edit
 ```
 
 安装后请重启 DSH：宿主端随服务器加载。界面跟随 DSH 显示语言（中文 / English）。
@@ -49,6 +49,8 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 - 只遮蔽普通的 `user` 消息节点（优先级 `-1`）；思考、工具调用与引导消息仍由宿主渲染。
 
 宿主端的分支逻辑源自 [dsh-message-edit](https://github.com/Moeblack/dsh-message-edit)（MIT © Moeblack），在其基础上重做为 ChatGPT 式回溯语义、同级分支展开，以及上述界面预设。
+
+两者名字相近，这里说明一下：这是另一个独立插件。它的路由、cordis id 与持久事件类型都保留了 `message-tree` 这一套命名，正是为了两个插件可以同时安装而互不冲突。
 
 ## 兼容性
 

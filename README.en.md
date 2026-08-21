@@ -1,14 +1,14 @@
-# dsh-plugin-message-tree
+# dsh-plugin-message-edit
 
 English | [简体中文](README.md)
 
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.1.0--rc.7-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
-[![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-tree?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-tree/stargazers)
+[![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 Edit a message you already sent and the conversation **rewinds and branches** from that point, the way ChatGPT, Claude and DeepSeek all do it. The old version is not overwritten — a `‹ 2/4 ›` counter appears under the bubble, and a Versions tab draws the whole tree.
 
-![demo](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-tree/master/assets/demo.gif)
+![demo](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-edit/master/assets/demo.gif)
 
 ## What it does
 
@@ -34,7 +34,7 @@ Only Claude offers retry on a user message, matching the real interface. There i
 ## Install
 
 ```bash
-dsh plugin --profile web add dsh-plugin-message-tree
+dsh plugin --profile web add dsh-plugin-message-edit
 ```
 
 Restart DSH afterwards — the host half loads with the server. The interface follows DSH's display language (English / 中文).
@@ -49,6 +49,8 @@ DSH sessions are append-only event logs with no in-session branching, so a rewin
 - Only the plain `user` message node is shadowed, at priority `-1`. Reasoning, tool calls and steering rows keep the host renderer.
 
 The host-side branching logic derives from [dsh-message-edit](https://github.com/Moeblack/dsh-message-edit) (MIT © Moeblack), reworked for ChatGPT-style rewind semantics, sibling fan-out, and the interface presets above.
+
+The names are similar, so to be explicit: this is a separate plugin. Its route, cordis id and durable event type keep a distinct `message-tree` spelling precisely so both can be installed side by side without colliding.
 
 ## Compatibility
 

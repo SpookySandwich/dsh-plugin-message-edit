@@ -5,6 +5,10 @@
 // the true rewind); ‹ 2/3 › switches between versions of the same message;
 // a Versions view draws the whole tree.
 
+// Route, CSS prefix and storage keys keep the `message-tree` spelling even
+// though the package is dsh-plugin-message-edit: Moeblack's dsh-message-edit
+// owns the `message-edit` names, and colliding would break both plugins when
+// installed together. See lib/index.js for the full note.
 const ROUTE = '/message-tree';
 const VIEW_ORDER = 16;
 
@@ -477,7 +481,7 @@ return {
         fit: 'Center view',
         empty: 'No versions yet — edit any of your messages to branch this conversation. Drag to pan, scroll to zoom.',
         images: '{count} image(s) kept as-is',
-        nav: 'Message Tree',
+        nav: 'Message Edit',
         styleLabel: 'Edit interface style',
         styleHint: 'Where the message controls sit and which ones appear. Changes apply live.',
         style_chatgpt: 'ChatGPT',
@@ -506,7 +510,7 @@ return {
         fit: '居中显示',
         empty: '还没有版本——编辑任意一条你的消息即可创建分支。拖动平移，滚轮缩放。',
         images: '{count} 张图片将原样保留',
-        nav: '消息树',
+        nav: '消息编辑',
         styleLabel: '编辑界面风格',
         styleHint: '消息操作按钮的位置与种类。修改即时生效。',
         style_chatgpt: 'ChatGPT',
@@ -1007,7 +1011,7 @@ return {
         versions.length <= 1 ? React.createElement('div', { className: 'mtx-empty' }, t('empty')) : null,
         React.createElement('a', {
           className: 'mtx-link',
-          href: 'https://github.com/SpookySandwich/dsh-plugin-message-tree',
+          href: 'https://github.com/SpookySandwich/dsh-plugin-message-edit',
           target: '_blank', rel: 'noreferrer',
         }, 'GitHub ↗')
       );
@@ -1060,7 +1064,7 @@ return {
         ),
         React.createElement('a', {
           className: 'mtx-set-link',
-          href: 'https://github.com/SpookySandwich/dsh-plugin-message-tree',
+          href: 'https://github.com/SpookySandwich/dsh-plugin-message-edit',
           target: '_blank', rel: 'noreferrer',
         }, 'GitHub ↗')
       );
