@@ -14,6 +14,60 @@ function realGlobal() {
   return null;
 }
 
+/* ------------------------------------------------------------- edit style -- */
+
+// Which provider's message-edit look to wear. The three named interfaces
+// cluster into a filled paradigm (ChatGPT, DeepSeek) and an outlined one
+// (Claude); each preset gets its own accurate treatment. The look is applied
+// as one attribute on <html>, so the whole stylesheet keys off it and a
+// switch takes effect live. The default preserves the original ChatGPT look.
+const STYLE_KEY = 'dsh-plugin-message-tree:style';
+const STYLES = ['chatgpt', 'deepseek', 'claude'];
+const DEFAULT_STYLE = 'chatgpt';
+
+const styleStore = {
+  value: null,
+  listeners: [],
+  get() {
+    if (this.value === null) {
+      const g = realGlobal();
+      let stored = null;
+      try { stored = g && g.localStorage && g.localStorage.getItem(STYLE_KEY); } catch (e) {}
+      this.value = STYLES.indexOf(stored) !== -1 ? stored : DEFAULT_STYLE;
+    }
+    return this.value;
+  },
+  set(next) {
+    this.value = STYLES.indexOf(next) !== -1 ? next : DEFAULT_STYLE;
+    const g = realGlobal();
+    try { if (g && g.localStorage) g.localStorage.setItem(STYLE_KEY, this.value); } catch (e) {}
+    syncStyleAttribute();
+    for (let i = 0; i < this.listeners.length; i++) {
+      try { this.listeners[i](); } catch (e) {}
+    }
+  },
+  subscribe(fn) {
+    const listeners = this.listeners;
+    listeners.push(fn);
+    return function () {
+      const at = listeners.indexOf(fn);
+      if (at !== -1) listeners.splice(at, 1);
+    };
+  },
+};
+
+function syncStyleAttribute() {
+  const g = realGlobal();
+  const root = g && g.document && g.document.documentElement;
+  if (root) root.setAttribute('data-mtx-style', styleStore.get());
+}
+
+function useStyle() {
+  const [, force] = React.useReducer(function (x) { return x + 1; }, 0);
+  React.useEffect(function () { return styleStore.subscribe(force); }, []);
+  return styleStore.get();
+}
+
 /* ------------------------------------------------------- timeline store -- */
 
 // One cached tree per session, shared by bubbles and the Versions view.
@@ -337,6 +391,46 @@ const CSS = [
   // Flash highlight when a graph click lands on its message.
   '@keyframes mtx-flash-kf{0%,55%{background:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 22%,transparent)}100%{background:transparent}}',
   '.mtx-flash .mtx-bubble{animation:mtx-flash-kf 1.4s ease-out}',
+
+  // The Send button carries both a label and an arrow; presets show one.
+  '.mtx-send-icon{display:none;font-size:16px;line-height:1}',
+
+  /* ---- style presets, keyed on <html data-mtx-style> ------------------- */
+  // The base rules above are the ChatGPT look; these two adjust the others.
+
+  // ChatGPT: solid, high-contrast (inverted) Send pill — black on light,
+  // white on dark, matching ChatGPT's own send button.
+  'html[data-mtx-style=chatgpt] .mtx-send{background:var(--dsw-alias-label-primary,#111);border-color:transparent;color:var(--dsw-alias-bg-primary,#1e1e22)}',
+  'html[data-mtx-style=chatgpt] .mtx-send:hover{filter:brightness(.92)}',
+
+  // DeepSeek: DSH-native — an accent-tinted bubble and a blue 发送.
+  'html[data-mtx-style=deepseek] .mtx-bubble,html[data-mtx-style=deepseek] .mtx-editor{background:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 12%,var(--dsw-alias-interactive-bg-hover,rgba(140,140,150,.14)))}',
+  'html[data-mtx-style=deepseek] .mtx-send{background:var(--dsw-alias-accent-primary,#4b8dff);border-color:transparent;color:#fff}',
+  'html[data-mtx-style=deepseek] .mtx-send:hover{filter:brightness(1.08)}',
+
+  // Claude: an outlined editor, a ghost (text-only) Cancel, and a circular
+  // arrow Send instead of a labelled pill.
+  'html[data-mtx-style=claude] .mtx-bubble{background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 7%,transparent);border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 26%,transparent)}',
+  'html[data-mtx-style=claude] .mtx-editor{background:transparent;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 34%,transparent)}',
+  'html[data-mtx-style=claude] .mtx-editor:focus-within{border-color:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 60%,transparent)}',
+  'html[data-mtx-style=claude] .mtx-btn:not([data-primary]){border-color:transparent;background:transparent}',
+  'html[data-mtx-style=claude] .mtx-btn:not([data-primary]):hover{background:var(--dsw-alias-interactive-bg-hover)}',
+  'html[data-mtx-style=claude] .mtx-send{width:34px;height:34px;min-width:34px;padding:0;border-radius:50%;background:var(--dsw-alias-accent-primary,#4b8dff);border-color:transparent;color:#fff;display:inline-flex;align-items:center;justify-content:center}',
+  'html[data-mtx-style=claude] .mtx-send:hover{filter:brightness(1.08)}',
+  'html[data-mtx-style=claude] .mtx-send-label{display:none}',
+  'html[data-mtx-style=claude] .mtx-send-icon{display:inline}',
+
+  /* ---- settings section ------------------------------------------------ */
+  '.mtx-set{display:flex;flex-direction:column;gap:12px;max-width:560px;font-size:14px;color:var(--dsw-alias-label-primary)}',
+  '.mtx-set-row{display:flex;align-items:center;justify-content:space-between;gap:12px}',
+  '.mtx-set-label{font-size:13px}',
+  '.mtx-select{border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 34%,transparent);background:var(--dsw-alias-bg-primary,rgba(30,30,34,.6));color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;padding:6px 10px;outline:none;cursor:pointer}',
+  '.mtx-set-hint{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}',
+  '.mtx-preview{margin-top:2px;padding:18px 16px 16px;border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 7%,transparent);border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 16%,transparent);pointer-events:none}',
+  '.mtx-preview .mtx-editor{margin-top:12px}',
+  '.mtx-preview .mtx-textarea{min-height:auto}',
+  '.mtx-set-link{align-self:flex-end;font-size:12px;color:var(--dsw-alias-label-tertiary);text-decoration:none;pointer-events:auto}',
+  '.mtx-set-link:hover{color:var(--dsw-alias-label-primary)}',
 ].join('');
 
 return {
@@ -344,6 +438,8 @@ return {
     const slots = ctx.get('slots');
     if (slots === undefined) return;
     ctx.effect(function () { return styles.insert(CSS); });
+    // Reflect the chosen edit style onto <html> now and on every change.
+    ctx.effect(function () { syncStyleAttribute(); return styleStore.subscribe(syncStyleAttribute); });
 
     let sessions = null;
     try { sessions = ctx.get('sessions'); } catch (e) {}
@@ -377,6 +473,16 @@ return {
         fit: 'Center view',
         empty: 'No versions yet — edit any of your messages to branch this conversation. Drag to pan, scroll to zoom.',
         images: '{count} image(s) kept as-is',
+        nav: 'Message Tree',
+        styleLabel: 'Edit interface style',
+        styleHint: 'How the message editor and version controls look. Changes apply live.',
+        style_chatgpt: 'ChatGPT',
+        style_deepseek: 'DeepSeek',
+        style_claude: 'Claude',
+        styleDesc_chatgpt: 'Filled bubble editor with a solid, high-contrast Send button.',
+        styleDesc_deepseek: 'DSH-native: an accent-tinted bubble and a blue Send.',
+        styleDesc_claude: 'An outlined editor with a round ↑ send button and a text Cancel.',
+        previewUser: 'Rewrite this paragraph to be more concise.',
       },
       zh: {
         view: '版本',
@@ -392,6 +498,16 @@ return {
         fit: '居中显示',
         empty: '还没有版本——编辑任意一条你的消息即可创建分支。拖动平移，滚轮缩放。',
         images: '{count} 张图片将原样保留',
+        nav: '消息树',
+        styleLabel: '编辑界面风格',
+        styleHint: '消息编辑器与版本控件的外观。修改即时生效。',
+        style_chatgpt: 'ChatGPT',
+        style_deepseek: 'DeepSeek',
+        style_claude: 'Claude',
+        styleDesc_chatgpt: '实心气泡编辑器，配高对比度的实心「发送」按钮。',
+        styleDesc_deepseek: 'DSH 原生风格：强调色气泡，蓝色「发送」。',
+        styleDesc_claude: '描边编辑器，圆形 ↑ 发送按钮，纯文字「取消」。',
+        previewUser: '把这段话改写得更简洁一些。',
       },
     };
     let t = function (key, params) {
@@ -510,9 +626,13 @@ return {
                 onClick: function () { setEditing(false); },
               }, t('cancel')),
               React.createElement('button', {
-                type: 'button', className: 'mtx-btn', 'data-primary': '', disabled: busy || draft.trim() === '',
+                type: 'button', className: 'mtx-btn mtx-send', 'data-primary': '', title: t('send'),
+                disabled: busy || draft.trim() === '',
                 onClick: submit,
-              }, t('send'))
+              },
+                React.createElement('span', { className: 'mtx-send-label' }, t('send')),
+                React.createElement('span', { className: 'mtx-send-icon', 'aria-hidden': true }, '↑')
+              )
             )
           )
         );
@@ -816,6 +936,62 @@ return {
         }, 'GitHub ↗')
       );
     }
+
+    // Settings: pick the edit-interface style, with a live preview that
+    // renders in the currently-selected look.
+    function StyleSettings() {
+      const style = useStyle();
+      return React.createElement('div', { className: 'mtx-set' },
+        React.createElement('div', { className: 'mtx-set-row' },
+          React.createElement('span', { className: 'mtx-set-label' }, t('styleLabel')),
+          React.createElement('select', {
+            className: 'mtx-select', value: style,
+            onChange: function (e) { styleStore.set(e.target.value); },
+          },
+            STYLES.map(function (s) {
+              return React.createElement('option', { key: s, value: s }, t('style_' + s));
+            })
+          )
+        ),
+        React.createElement('div', { className: 'mtx-set-hint' }, t('styleDesc_' + style)),
+        React.createElement('div', { className: 'mtx-preview' },
+          React.createElement('div', { className: 'mtx-row' },
+            React.createElement('div', { className: 'mtx-line' },
+              React.createElement('div', { className: 'mtx-bubble' }, t('previewUser'))
+            ),
+            React.createElement('div', { className: 'mtx-ring' },
+              React.createElement('button', { type: 'button', disabled: true }, '‹'),
+              React.createElement('span', null, '2/3'),
+              React.createElement('button', { type: 'button', disabled: true }, '›')
+            )
+          ),
+          React.createElement('div', { className: 'mtx-editor' },
+            React.createElement('div', { className: 'mtx-textarea' }, t('previewUser')),
+            React.createElement('div', { className: 'mtx-editor-actions' },
+              React.createElement('button', { type: 'button', className: 'mtx-btn' }, t('cancel')),
+              React.createElement('button', { type: 'button', className: 'mtx-btn mtx-send', 'data-primary': '' },
+                React.createElement('span', { className: 'mtx-send-label' }, t('send')),
+                React.createElement('span', { className: 'mtx-send-icon', 'aria-hidden': true }, '↑')
+              )
+            )
+          )
+        ),
+        React.createElement('a', {
+          className: 'mtx-set-link',
+          href: 'https://github.com/SpookySandwich/dsh-plugin-message-tree',
+          target: '_blank', rel: 'noreferrer',
+        }, 'GitHub ↗')
+      );
+    }
+
+    try {
+      slots.inject('settings.section', function () {
+        return slots.register(
+          { name: 'settings.section', id: 'message-tree', order: 210, label: function () { return t('nav'); } },
+          StyleSettings
+        );
+      });
+    } catch (e) {}
 
     // Shadow only the plain user bubble; steering and context rows keep the
     // host renderer. A collision with another user-bubble plugin degrades to
