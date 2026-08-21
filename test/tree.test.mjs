@@ -1,4 +1,4 @@
-import { attachParentId, ringFor, rootOf } from '../lib/tree-logic.js';
+import { attachParentId, ringFor, rootOf, ancestorChainFromLog, collectFamily } from '../lib/tree-logic.js';
 
 function node(id, parentSessionId, targetTurn) {
   return { sessionId: id, parentSessionId, targetTurn, createdAt: 0 };
@@ -139,6 +139,74 @@ check('a hole in the parent chain yields no ring, not a crash',
 
 // rootOf across the same hole must terminate at the last visible node.
 check('rootOf stops at the hole instead of crashing', rootOf(chain, 'C'), 'C');
+
+
+/* ---- deletion bridging -------------------------------------------------- */
+// A version's seed inherits its ancestors' message-tree/version markers, so a
+// deleted ancestor's identity survives in its descendants' logs. The host
+// rebuilds the family through holes and emits ghost entries (deleted: true);
+// the ring skips ghosts but still uses them as fork anchors and chain links.
+
+function marker(ownerParentId, targetTurn, time) {
+  return { data: { effect: { targetTurn }, inverse: { sessionId: ownerParentId } }, time };
+}
+
+// Chain A -> B -> C -> S: S's log carries [B's, C's, S's] markers.
+const chainMarkers = [marker('A', 1, 2), marker('B', 2, 3), marker('C', 3, 4)];
+check('ancestor chain recovered from one log, nearest first',
+  ancestorChainFromLog('C', chainMarkers).map((l) => l.sessionId), ['C', 'B', 'A']);
+check('a same-turn sibling sees only the fork original',
+  ancestorChainFromLog('A', [marker('A', 1, 2)]).map((l) => l.sessionId), ['A']);
+check('a root session has no chain', ancestorChainFromLog(undefined, []), []);
+
+// collectFamily bridges a deleted middle link C between B and D.
+const bridged = collectFamily('A', [
+  { id: 'A', createdAt: 1, ghost: false },
+  { id: 'B', parentId: 'A', createdAt: 2, ghost: false },
+  { id: 'C', parentId: 'B', createdAt: 3, ghost: true },
+  { id: 'D', parentId: 'C', createdAt: 4, ghost: false },
+]);
+check('a deleted chain link keeps the family one tree', {
+  order: bridged.map((n) => n.entry.id),
+  depths: bridged.map((n) => n.depth),
+  ghost: bridged.map((n) => !!n.entry.ghost),
+}, { order: ['A', 'B', 'C', 'D'], depths: [0, 1, 2, 3], ghost: [false, false, true, false] });
+
+// A parentId nobody has an entry for is synthesized as a bare ghost, and
+// unrelated sessions in the corpus are never pulled in.
+const synth = collectFamily('A', [
+  { id: 'V2', parentId: 'A', createdAt: 2, ghost: false },
+  { id: 'V3', parentId: 'A', createdAt: 3, ghost: false },
+  { id: 'other', createdAt: 9, ghost: false },
+]);
+check('a deleted original is synthesized as the ghost root', {
+  order: synth.map((n) => n.entry.id),
+  rootGhost: !!synth[0].entry.ghost,
+}, { order: ['A', 'V2', 'V3'], rootGhost: true });
+
+// Ring over ten siblings whose ORIGINAL was deleted: the ghost anchors the
+// fork but is not a page, so survivors renumber ‹k/9›.
+const ghosted = [{ sessionId: 'A', deleted: true, createdAt: 1 }];
+for (let i = 2; i <= 10; i++) ghosted.push({ sessionId: 'V' + i, parentSessionId: 'A', targetTurn: 1, createdAt: i });
+const ghostRing = ringFor(ghosted, 'V6', 1);
+check('ghost original anchors the fork without being a page', {
+  n: ghostRing.alternatives.length,
+  hasGhost: ghostRing.alternatives.some((v) => v.deleted),
+  index: ghostRing.index,
+}, { n: 9, hasGhost: false, index: 4 });
+
+// Old-build chains: A -> B(del, turn 1) -> C(turn 1). The ghost bridges the
+// walk, so the ring still pairs C with the surviving original.
+const ghostChain = [
+  { sessionId: 'A', createdAt: 1 },
+  { sessionId: 'B', parentSessionId: 'A', targetTurn: 1, createdAt: 2, deleted: true },
+  { sessionId: 'C', parentSessionId: 'B', targetTurn: 1, createdAt: 3 },
+];
+const ghostChainRing = ringFor(ghostChain, 'C', 1);
+check('a ghost chain link still connects survivors into one ring', {
+  ids: ghostChainRing.alternatives.map((v) => v.sessionId),
+  index: ghostChainRing.index,
+}, { ids: ['A', 'C'], index: 1 });
 
 console.log(`
 ${failed === 0 ? 'all passed' : failed + ' failed'}`);

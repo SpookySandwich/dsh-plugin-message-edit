@@ -297,9 +297,12 @@ function ringFor(versions, sessionId, turn) {
     }
     return false;
   }
+  // A deleted (ghost) version still anchors the fork and still bridges the
+  // parent walks above, but it cannot be opened, so it never appears among
+  // the alternatives: the ring renumbers over the survivors.
   const alternatives = versions
     .filter(function (v) {
-      return v.sessionId === fork.sessionId || (v.targetTurn === turn && walksToFork(v));
+      return !v.deleted && (v.sessionId === fork.sessionId || (v.targetTurn === turn && walksToFork(v)));
     })
     .sort(function (a, b) {
       return a.createdAt - b.createdAt || String(a.sessionId).localeCompare(String(b.sessionId));
@@ -513,6 +516,8 @@ const CSS = [
   '.mtx-card:hover{box-shadow:0 6px 22px rgba(0,0,0,.24);border-color:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 55%,transparent)}',
   '.mtx-card[data-current]{border-color:var(--dsw-alias-accent-primary,#4b8dff);box-shadow:0 0 0 1px var(--dsw-alias-accent-primary,#4b8dff),0 6px 24px color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 30%,transparent)}',
   '.mtx-card[data-dragging]{cursor:grabbing;box-shadow:0 14px 34px rgba(0,0,0,.3);z-index:3}',
+  '.mtx-card[data-deleted]{opacity:.55;border-style:dashed;cursor:default}',
+  '.mtx-card[data-deleted]:hover{box-shadow:0 2px 10px rgba(0,0,0,.14);border-color:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 30%,transparent)}',
   '.mtx-card-icon{flex:none;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:12px;background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 18%,transparent);color:var(--dsw-alias-label-secondary,#bbb)}',
   '.mtx-card[data-path] .mtx-card-icon{background:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 20%,transparent);color:var(--dsw-alias-accent-primary,#4b8dff)}',
   '.mtx-card-main{min-width:0;flex:1}',
@@ -623,6 +628,7 @@ return {
         styleDesc_chatgpt: 'Copy and edit under the bubble, revealed on hover. Cancel and Send sit inside the editor.',
         styleDesc_deepseek: 'Copy and edit under the bubble, always visible — closest to DSH itself. Cancel and Send sit inside the editor.',
         styleDesc_claude: 'Retry, edit and copy under the bubble, revealed on hover. Cancel and Save sit below the editor.',
+        deletedVersion: 'Deleted version',
         rememberPathLabel: 'Remember the version I was viewing',
         rememberPathHint: 'Reopening a conversation returns to the branch you last had open instead of the original. Off means it always opens the first version.',
         stopOnEditLabel: 'Stop the running reply when I edit',
@@ -656,6 +662,7 @@ return {
         styleDesc_chatgpt: '气泡下方为复制与编辑，悬停时显示；「取消 / 发送」位于编辑框内部。',
         styleDesc_deepseek: '气泡下方为复制与编辑，始终显示——最接近 DSH 原生；「取消 / 发送」位于编辑框内部。',
         styleDesc_claude: '气泡下方为重试、编辑与复制，悬停时显示；「取消 / 保存」位于编辑框下方。',
+        deletedVersion: '已删除的版本',
         rememberPathLabel: '记住我正在查看的版本',
         rememberPathHint: '重新打开会话时回到上次查看的分支，而不是最初那条。关闭后始终打开第一个版本。',
         stopOnEditLabel: '编辑时中止正在生成的回复',
@@ -1071,7 +1078,7 @@ return {
       function openVersion(id) {
         const lay = layoutRef.current;
         const v = lay && lay.byId.get(id);
-        if (!v || !sessions) return;
+        if (!v || v.deleted || !sessions) return;
         openWhenListed(sessions, v.sessionId);
         showChat();
         if (typeof v.targetTurn === 'number') flashTurn(v.sessionId, v.targetTurn, 45);
@@ -1128,6 +1135,7 @@ return {
       }
 
       function cardTitle(v) {
+        if (v.deleted) return t('deletedVersion');
         if (!v.parentSessionId) return t('original');
         if (v.operation === 'edit') return t('edited', { turn: v.targetTurn });
         if (v.operation === 'retry') return t('retried', { turn: v.targetTurn });
@@ -1169,11 +1177,12 @@ return {
               'data-id': v.sessionId,
               'data-current': v.current || undefined,
               'data-path': v.onCurrentPath || undefined,
+              'data-deleted': v.deleted || undefined,
               style: { transform: 'translate(' + (s.x - CARD_W / 2) + 'px,' + s.y + 'px)' },
               ref: function (el) { if (el) cardEls.current.set(v.sessionId, el); else cardEls.current.delete(v.sessionId); },
             },
               React.createElement('span', { className: 'mtx-card-icon' },
-                v.parentSessionId ? (v.operation === 'retry' ? '↻' : '✎') : '●'),
+                v.deleted ? '∅' : v.parentSessionId ? (v.operation === 'retry' ? '↻' : '✎') : '●'),
               React.createElement('span', { className: 'mtx-card-main' },
                 React.createElement('span', { className: 'mtx-card-title' }, cardTitle(v)),
                 React.createElement('span', { className: 'mtx-card-sub' }, sub)
