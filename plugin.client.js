@@ -16,11 +16,13 @@ function realGlobal() {
 
 /* ------------------------------------------------------------- edit style -- */
 
-// Which provider's message-edit look to wear. The three named interfaces
-// cluster into a filled paradigm (ChatGPT, DeepSeek) and an outlined one
-// (Claude); each preset gets its own accurate treatment. The look is applied
-// as one attribute on <html>, so the whole stylesheet keys off it and a
-// switch takes effect live. The default preserves the original ChatGPT look.
+// Which provider's message-edit LAYOUT to follow. All three put the controls
+// below the bubble; what differs is which controls exist (only Claude offers
+// retry), whether they wait for hover (ChatGPT and Claude) or stay visible
+// (DeepSeek, like DSH itself), and whether the editor's Cancel/confirm sit
+// inside the box or below it. Colours stay native in every preset. The choice
+// is one attribute on <html>, so the stylesheet keys off it and switching
+// takes effect live.
 const STYLE_KEY = 'dsh-plugin-message-tree:style';
 const STYLES = ['chatgpt', 'deepseek', 'claude'];
 const DEFAULT_STYLE = 'chatgpt';
@@ -392,33 +394,30 @@ const CSS = [
   '@keyframes mtx-flash-kf{0%,55%{background:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 22%,transparent)}100%{background:transparent}}',
   '.mtx-flash .mtx-bubble{animation:mtx-flash-kf 1.4s ease-out}',
 
-  // The Send button carries both a label and an arrow; presets show one.
-  '.mtx-send-icon{display:none;font-size:16px;line-height:1}',
+  /* ---- action row, below the bubble ------------------------------------ */
+  // All three references put the message controls BELOW the bubble, not
+  // beside it. What differs is which controls exist and whether they are
+  // always visible or revealed on hover.
+  '.mtx-actions{display:flex;align-items:center;gap:2px;margin-top:1px}',
+  '.mtx-act{width:26px;height:26px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer}',
+  '.mtx-act:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+  '.mtx-act[disabled]{opacity:.4;cursor:default}',
+  // ChatGPT and Claude reveal the controls on hover; DeepSeek keeps them out,
+  // which is also how DSH itself behaves.
+  'html[data-mtx-style=chatgpt] .mtx-actions,html[data-mtx-style=claude] .mtx-actions{opacity:0;transition:opacity 120ms ease}',
+  'html[data-mtx-style=chatgpt] .mtx-row:hover .mtx-actions,html[data-mtx-style=chatgpt] .mtx-row:focus-within .mtx-actions,',
+  'html[data-mtx-style=claude] .mtx-row:hover .mtx-actions,html[data-mtx-style=claude] .mtx-row:focus-within .mtx-actions{opacity:1}',
+  // Only Claude offers a retry control on the user message.
+  '.mtx-act[data-act=retry]{display:none}',
+  'html[data-mtx-style=claude] .mtx-act[data-act=retry]{display:inline-flex}',
 
-  /* ---- style presets, keyed on <html data-mtx-style> ------------------- */
-  // The base rules above are the ChatGPT look; these two adjust the others.
+  /* ---- editor button placement ----------------------------------------- */
+  // ChatGPT and DeepSeek keep Cancel/Send INSIDE the editor box. Claude puts
+  // them OUTSIDE, below it, and names the primary action Save.
+  '.mtx-editor-outside{display:none;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px;width:min(85%,720px)}',
+  'html[data-mtx-style=claude] .mtx-editor-actions{display:none}',
+  'html[data-mtx-style=claude] .mtx-editor-outside{display:flex}',
 
-  // ChatGPT: solid, high-contrast (inverted) Send pill — black on light,
-  // white on dark, matching ChatGPT's own send button.
-  'html[data-mtx-style=chatgpt] .mtx-send{background:var(--dsw-alias-label-primary,#111);border-color:transparent;color:var(--dsw-alias-bg-primary,#1e1e22)}',
-  'html[data-mtx-style=chatgpt] .mtx-send:hover{filter:brightness(.92)}',
-
-  // DeepSeek: DSH-native — an accent-tinted bubble and a blue 发送.
-  'html[data-mtx-style=deepseek] .mtx-bubble,html[data-mtx-style=deepseek] .mtx-editor{background:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 12%,var(--dsw-alias-interactive-bg-hover,rgba(140,140,150,.14)))}',
-  'html[data-mtx-style=deepseek] .mtx-send{background:var(--dsw-alias-accent-primary,#4b8dff);border-color:transparent;color:#fff}',
-  'html[data-mtx-style=deepseek] .mtx-send:hover{filter:brightness(1.08)}',
-
-  // Claude: an outlined editor, a ghost (text-only) Cancel, and a circular
-  // arrow Send instead of a labelled pill.
-  'html[data-mtx-style=claude] .mtx-bubble{background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 7%,transparent);border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 26%,transparent)}',
-  'html[data-mtx-style=claude] .mtx-editor{background:transparent;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 34%,transparent)}',
-  'html[data-mtx-style=claude] .mtx-editor:focus-within{border-color:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 60%,transparent)}',
-  'html[data-mtx-style=claude] .mtx-btn:not([data-primary]){border-color:transparent;background:transparent}',
-  'html[data-mtx-style=claude] .mtx-btn:not([data-primary]):hover{background:var(--dsw-alias-interactive-bg-hover)}',
-  'html[data-mtx-style=claude] .mtx-send{width:34px;height:34px;min-width:34px;padding:0;border-radius:50%;background:var(--dsw-alias-accent-primary,#4b8dff);border-color:transparent;color:#fff;display:inline-flex;align-items:center;justify-content:center}',
-  'html[data-mtx-style=claude] .mtx-send:hover{filter:brightness(1.08)}',
-  'html[data-mtx-style=claude] .mtx-send-label{display:none}',
-  'html[data-mtx-style=claude] .mtx-send-icon{display:inline}',
 
   /* ---- settings section ------------------------------------------------ */
   '.mtx-set{display:flex;flex-direction:column;gap:12px;max-width:560px;font-size:14px;color:var(--dsw-alias-label-primary)}',
@@ -429,6 +428,7 @@ const CSS = [
   '.mtx-preview{margin-top:2px;padding:18px 16px 16px;border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 7%,transparent);border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 16%,transparent);pointer-events:none}',
   '.mtx-preview .mtx-editor{margin-top:12px}',
   '.mtx-preview .mtx-textarea{min-height:auto}',
+  '.mtx-preview .mtx-actions{opacity:1!important}',
   '.mtx-set-link{align-self:flex-end;font-size:12px;color:var(--dsw-alias-label-tertiary);text-decoration:none;pointer-events:auto}',
   '.mtx-set-link:hover{color:var(--dsw-alias-label-primary)}',
 ].join('');
@@ -464,6 +464,10 @@ return {
         edit: 'Edit message',
         cancel: 'Cancel',
         send: 'Send',
+        save: 'Save',
+        copy: 'Copy',
+        copied: 'Copied',
+        retry: 'Retry this turn',
         regen: 'Regenerate from here',
         original: 'Original conversation',
         edited: 'Edited turn {turn}',
@@ -475,13 +479,13 @@ return {
         images: '{count} image(s) kept as-is',
         nav: 'Message Tree',
         styleLabel: 'Edit interface style',
-        styleHint: 'How the message editor and version controls look. Changes apply live.',
+        styleHint: 'Where the message controls sit and which ones appear. Changes apply live.',
         style_chatgpt: 'ChatGPT',
         style_deepseek: 'DeepSeek',
         style_claude: 'Claude',
-        styleDesc_chatgpt: 'Filled bubble editor with a solid, high-contrast Send button.',
-        styleDesc_deepseek: 'DSH-native: an accent-tinted bubble and a blue Send.',
-        styleDesc_claude: 'An outlined editor with a round ↑ send button and a text Cancel.',
+        styleDesc_chatgpt: 'Copy and edit under the bubble, revealed on hover. Cancel and Send sit inside the editor.',
+        styleDesc_deepseek: 'Copy and edit under the bubble, always visible — closest to DSH itself. Cancel and Send sit inside the editor.',
+        styleDesc_claude: 'Retry, edit and copy under the bubble, revealed on hover. Cancel and Save sit below the editor.',
         previewUser: 'Rewrite this paragraph to be more concise.',
       },
       zh: {
@@ -489,6 +493,10 @@ return {
         edit: '编辑消息',
         cancel: '取消',
         send: '发送',
+        save: '保存',
+        copy: '复制',
+        copied: '已复制',
+        retry: '重试本轮',
         regen: '从这里重新生成',
         original: '原始对话',
         edited: '编辑了第 {turn} 轮',
@@ -500,13 +508,13 @@ return {
         images: '{count} 张图片将原样保留',
         nav: '消息树',
         styleLabel: '编辑界面风格',
-        styleHint: '消息编辑器与版本控件的外观。修改即时生效。',
+        styleHint: '消息操作按钮的位置与种类。修改即时生效。',
         style_chatgpt: 'ChatGPT',
         style_deepseek: 'DeepSeek',
         style_claude: 'Claude',
-        styleDesc_chatgpt: '实心气泡编辑器，配高对比度的实心「发送」按钮。',
-        styleDesc_deepseek: 'DSH 原生风格：强调色气泡，蓝色「发送」。',
-        styleDesc_claude: '描边编辑器，圆形 ↑ 发送按钮，纯文字「取消」。',
+        styleDesc_chatgpt: '气泡下方为复制与编辑，悬停时显示；「取消 / 发送」位于编辑框内部。',
+        styleDesc_deepseek: '气泡下方为复制与编辑，始终显示——最接近 DSH 原生；「取消 / 发送」位于编辑框内部。',
+        styleDesc_claude: '气泡下方为重试、编辑与复制，悬停时显示；「取消 / 保存」位于编辑框下方。',
         previewUser: '把这段话改写得更简洁一些。',
       },
     };
@@ -528,6 +536,30 @@ return {
         React.createElement('path', {
           d: 'M11.1 2.4a1.6 1.6 0 012.3 2.3l-7.2 7.2-3 .8.8-3 7.1-7.3z',
           stroke: 'currentColor', strokeWidth: 1.3, strokeLinejoin: 'round',
+        }));
+    }
+
+    function CopyIcon() {
+      return React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
+        React.createElement('rect', {
+          x: 5.4, y: 5.4, width: 8.2, height: 8.2, rx: 2,
+          stroke: 'currentColor', strokeWidth: 1.3,
+        }),
+        React.createElement('path', {
+          d: 'M10.6 5.2V4.2a1.8 1.8 0 00-1.8-1.8H4.2a1.8 1.8 0 00-1.8 1.8v4.6a1.8 1.8 0 001.8 1.8h1',
+          stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round',
+        }));
+    }
+
+    function RetryIcon() {
+      return React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
+        React.createElement('path', {
+          d: 'M13.2 8a5.2 5.2 0 11-1.6-3.75',
+          stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round',
+        }),
+        React.createElement('path', {
+          d: 'M13.4 2.3v3.1h-3.1',
+          stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
         }));
     }
 
@@ -573,6 +605,7 @@ return {
       const [draft, setDraft] = React.useState('');
       const [busy, setBusy] = React.useState(false);
       const [error, setError] = React.useState(null);
+      const [copied, setCopied] = React.useState(false);
 
       const canEdit = !running && sessionId !== undefined && typeof turn === 'number' && text !== '' && !editing;
 
@@ -605,7 +638,45 @@ return {
         setBusy(false);
       }
 
+      async function retry() {
+        if (typeof turn !== 'number') return;
+        setBusy(true);
+        setError(null);
+        try {
+          const result = await mutate({ action: 'retry', sessionId: sessionId, turn: turn });
+          treeStore.invalidate();
+          if (sessions) openWhenListed(sessions, result.sessionId);
+        } catch (e) {
+          setError(String(e && e.message || e));
+        }
+        setBusy(false);
+      }
+
+      function copy() {
+        const g = realGlobal();
+        try {
+          if (g && g.navigator && g.navigator.clipboard) g.navigator.clipboard.writeText(text);
+        } catch (e) {}
+        setCopied(true);
+        setTimeout(function () { setCopied(false); }, 1200);
+      }
+
       if (editing) {
+        // Both action rows are rendered; CSS shows the one this preset wants —
+        // inside the box (ChatGPT, DeepSeek) or below it (Claude).
+        const cancelButton = function (key) {
+          return React.createElement('button', {
+            key: key, type: 'button', className: 'mtx-btn', disabled: busy,
+            onClick: function () { setEditing(false); },
+          }, t('cancel'));
+        };
+        const confirmButton = function (key, label) {
+          return React.createElement('button', {
+            key: key, type: 'button', className: 'mtx-btn', 'data-primary': '',
+            disabled: busy || draft.trim() === '',
+            onClick: submit,
+          }, label);
+        };
         return React.createElement('div', { className: 'mtx-row' },
           React.createElement('div', { className: 'mtx-editor' },
             React.createElement('textarea', {
@@ -621,35 +692,40 @@ return {
             images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null,
             error ? React.createElement('div', { className: 'mtx-error' }, error) : null,
             React.createElement('div', { className: 'mtx-editor-actions' },
-              React.createElement('button', {
-                type: 'button', className: 'mtx-btn', disabled: busy,
-                onClick: function () { setEditing(false); },
-              }, t('cancel')),
-              React.createElement('button', {
-                type: 'button', className: 'mtx-btn mtx-send', 'data-primary': '', title: t('send'),
-                disabled: busy || draft.trim() === '',
-                onClick: submit,
-              },
-                React.createElement('span', { className: 'mtx-send-label' }, t('send')),
-                React.createElement('span', { className: 'mtx-send-icon', 'aria-hidden': true }, '↑')
-              )
+              cancelButton('c-in'), confirmButton('s-in', t('send'))
             )
+          ),
+          React.createElement('div', { className: 'mtx-editor-outside' },
+            cancelButton('c-out'), confirmButton('s-out', t('save'))
           )
         );
       }
 
       return React.createElement('div', { className: 'mtx-row', 'data-turn': turn, 'data-session': sessionId },
         React.createElement('div', { className: 'mtx-line' },
-          canEdit ? React.createElement('button', {
-            type: 'button', className: 'mtx-edit-btn', title: t('edit'),
-            onClick: beginEdit,
-          }, PencilIcon()) : null,
           React.createElement('div', { className: 'mtx-bubble' },
             text,
             images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null
           )
         ),
-        React.createElement(VersionRing, { ring: ring })
+        // The controls sit under the bubble in all three references. Which
+        // ones exist, and whether they wait for hover, is what differs.
+        React.createElement('div', { className: 'mtx-actions' },
+          React.createElement(VersionRing, { ring: ring }),
+          React.createElement('button', {
+            type: 'button', className: 'mtx-act', 'data-act': 'retry',
+            title: t('retry'), disabled: !canEdit || busy, onClick: retry,
+          }, RetryIcon()),
+          React.createElement('button', {
+            type: 'button', className: 'mtx-act', 'data-act': 'edit',
+            title: t('edit'), disabled: !canEdit, onClick: beginEdit,
+          }, PencilIcon()),
+          React.createElement('button', {
+            type: 'button', className: 'mtx-act', 'data-act': 'copy',
+            title: copied ? t('copied') : t('copy'), onClick: copy,
+          }, CopyIcon())
+        ),
+        error ? React.createElement('div', { className: 'mtx-error' }, error) : null
       );
     }
 
@@ -959,21 +1035,27 @@ return {
             React.createElement('div', { className: 'mtx-line' },
               React.createElement('div', { className: 'mtx-bubble' }, t('previewUser'))
             ),
-            React.createElement('div', { className: 'mtx-ring' },
-              React.createElement('button', { type: 'button', disabled: true }, '‹'),
-              React.createElement('span', null, '2/3'),
-              React.createElement('button', { type: 'button', disabled: true }, '›')
+            React.createElement('div', { className: 'mtx-actions' },
+              React.createElement('div', { className: 'mtx-ring' },
+                React.createElement('button', { type: 'button', disabled: true }, '‹'),
+                React.createElement('span', null, '2/3'),
+                React.createElement('button', { type: 'button', disabled: true }, '›')
+              ),
+              React.createElement('span', { className: 'mtx-act', 'data-act': 'retry' }, RetryIcon()),
+              React.createElement('span', { className: 'mtx-act', 'data-act': 'edit' }, PencilIcon()),
+              React.createElement('span', { className: 'mtx-act', 'data-act': 'copy' }, CopyIcon())
             )
           ),
           React.createElement('div', { className: 'mtx-editor' },
             React.createElement('div', { className: 'mtx-textarea' }, t('previewUser')),
             React.createElement('div', { className: 'mtx-editor-actions' },
-              React.createElement('button', { type: 'button', className: 'mtx-btn' }, t('cancel')),
-              React.createElement('button', { type: 'button', className: 'mtx-btn mtx-send', 'data-primary': '' },
-                React.createElement('span', { className: 'mtx-send-label' }, t('send')),
-                React.createElement('span', { className: 'mtx-send-icon', 'aria-hidden': true }, '↑')
-              )
+              React.createElement('span', { className: 'mtx-btn' }, t('cancel')),
+              React.createElement('span', { className: 'mtx-btn', 'data-primary': '' }, t('send'))
             )
+          ),
+          React.createElement('div', { className: 'mtx-editor-outside' },
+            React.createElement('span', { className: 'mtx-btn' }, t('cancel')),
+            React.createElement('span', { className: 'mtx-btn', 'data-primary': '' }, t('save'))
           )
         ),
         React.createElement('a', {
