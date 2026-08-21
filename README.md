@@ -1,34 +1,58 @@
 # dsh-plugin-message-tree
 
-[English](./README.en.md) | 中文
+[English](README.en.md) | 简体中文
 
-给 DeepSeek Harness 带来 ChatGPT 式的消息编辑体验：悬停任意一条你发过的消息，点击铅笔即可修改并重新发送——对话会从那一刻真正回溯并分叉，而不是简单续写。
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![dsh](https://img.shields.io/badge/dsh-0.1.0--rc.7-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-tree?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-tree/stargazers)
 
-- **就地编辑**：悬停你的消息 → 铅笔 → 修改 → 发送。新分支携带编辑后的提问，从该回合之前的完整上下文重新生成。
-- **版本切换**：同一条消息存在多个版本时，气泡下方出现 `‹ 2/3 ›`，一键在各版本之间来回切换。
-- **版本树视图**：会话顶部新增「版本」标签页，以树状缩进展示全部分支——当前所在分支高亮，点击任意节点即可跳转。
-- **持久可靠**：每个分支都是一个真实的会话，版本关系写入持久事件，重启后依旧完整。分支不会出现在左侧会话列表里，编辑 21 次也还是原来那一条对话；用气泡下的 `‹ ›` 或「版本」页切换。
+编辑一条已经发出的消息，对话会从那一刻 **真正回溯并分叉**——和 ChatGPT、Claude、DeepSeek 的做法一致。旧版本不会被覆盖：气泡下方出现 `‹ 2/4 ›` 计数，「版本」标签页则画出整棵树。
+
+![演示](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-tree/master/assets/demo-zh.gif)
+
+## 功能
+
+- **编辑并分叉**：修改过去的提问并发送，新分支会带着该轮 *之前* 的完整上下文重新生成。这是真正的回溯，而不是从末尾继续的 fork。
+- **版本计数**：一条消息存在多个版本时，下方出现 `‹ n/m ›`，左右箭头在各版本间切换。
+- **版本树**：新增「版本」标签页，以图的方式展示所有分支，可平移、缩放、拖动。当前所在分支高亮，点击任意节点即可跳转。
+- **重试**：不修改内容，直接重跑该轮（Claude 布局）。
+- **复制**：把消息文本复制到剪贴板。
+- **持久可靠**：每个分支都是真实会话，版本关系写入持久事件，重启后依旧完整。分支不会出现在左侧会话列表里——编辑二十次，看起来仍是一条对话。
+
+## 界面风格
+
+这三家界面的差别在于 **操作按钮放在哪里、有哪些**，因此预设只改变这一点，颜色始终沿用 DSH 原生配色。在 **设置 → 消息树** 中选择，面板内有实时预览。
+
+| 预设 | 气泡下方的按钮 | 显示方式 | 编辑框按钮 |
+| --- | --- | --- | --- |
+| **ChatGPT** | 编辑、复制 | 悬停时显示 | `取消` / `发送` 在框 **内部** |
+| **DeepSeek** | 编辑、复制 | 始终显示——与 DSH 一致 | `取消` / `发送` 在框 **内部** |
+| **Claude** | **重试**、编辑、复制 | 悬停时显示 | `取消` / `保存` 在框 **下方** |
+
+只有 Claude 在用户消息上提供重试，与真实界面一致。没有分享按钮——DSH 本身没有，就不自行发明。
 
 ## 安装
 
-在 DeepSeek Harness 的插件市场中搜索 `dsh-plugin-message-tree`，或手动安装：
-
-```
-dsh plugin add dsh-plugin-message-tree
+```bash
+dsh plugin --profile web add dsh-plugin-message-tree
 ```
 
-安装后重启 DSH（宿主端需要随服务器加载）。
+安装后请重启 DSH：宿主端随服务器加载。界面跟随 DSH 显示语言（中文 / English）。
 
 ## 工作原理
 
-DSH 的会话是仅追加的事件日志，本身不支持会话内分支。本插件的宿主端提供 `/message-tree` 接口：编辑消息时，它以目标回合之前的事件为种子创建一个新会话，写入持久的版本标记事件，并把编辑后的消息作为新提问送入。客户端读取这些标记还原出完整的版本树。
+DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因此回溯需要另行实现：
 
-宿主端分支逻辑部分源自 [dsh-message-edit](https://github.com/Moeblack/dsh-message-edit)（MIT，© Moeblack），在其之上重新设计了面向 ChatGPT 式交互的界面与版本环切换算法。
+- 宿主端提供 `/message-tree` 接口。编辑消息时，会 **以目标轮次之前的全部事件为种子创建一个新会话**，写入持久的 `message-tree/version` 标记说明改动内容，并把编辑后的提问送入。
+- 之后读取这些标记，还原出整棵版本树、`‹ n/m ›` 计数，以及当前处于哪个分支。
+- 标记事件带有信封上的 `ignorable` 标志。插件自定义的事件类型不在宿主的事件词表内，缺少该标志时读取端会拒绝解释整份日志，会话将直接打不开。
+- 只遮蔽普通的 `user` 消息节点（优先级 `-1`）；思考、工具调用与引导消息仍由宿主渲染。
+
+宿主端的分支逻辑源自 [dsh-message-edit](https://github.com/Moeblack/dsh-message-edit)（MIT © Moeblack），在其基础上重做为 ChatGPT 式回溯语义、同级分支展开，以及上述界面预设。
 
 ## 兼容性
 
-- 仅以 `-1` 优先级遮蔽 `user` 消息气泡，其余渲染（思考、工具调用、引导消息等）不受影响；可与 [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream) 等插件共存。
-- 界面跟随 DSH 显示语言（中文/英文）。
+可与 [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream)、[dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout) 共存。
 
 ## 许可
 
