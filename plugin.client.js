@@ -626,7 +626,7 @@ return {
         rememberPathLabel: 'Remember the version I was viewing',
         rememberPathHint: 'Reopening a conversation returns to the branch you last had open instead of the original. Off means it always opens the first version.',
         stopOnEditLabel: 'Stop the running reply when I edit',
-        stopOnEditHint: 'Editing a message cancels the reply still being generated before branching, so the superseded answer stops spending tokens. This also lets you edit mid-reply. Off leaves it running.',
+        stopOnEditHint: 'Editing or retrying cancels every reply still being generated in this conversation before branching, including other versions, so no superseded answer keeps spending tokens. This also lets you edit mid-reply. Off leaves them running.',
         previewUser: 'Rewrite this paragraph to be more concise.',
       },
       zh: {
@@ -659,7 +659,7 @@ return {
         rememberPathLabel: '记住我正在查看的版本',
         rememberPathHint: '重新打开会话时回到上次查看的分支，而不是最初那条。关闭后始终打开第一个版本。',
         stopOnEditLabel: '编辑时中止正在生成的回复',
-        stopOnEditHint: '编辑消息时，先取消仍在生成的那条回复再分支，避免被取代的回答继续消耗额度；同时允许在回复过程中直接编辑。关闭后旧回复会继续跑完。',
+        stopOnEditHint: '编辑或重试时，先取消该会话中所有仍在生成的回复（包括其它版本）再分支，避免被取代的回答继续消耗额度；同时允许在回复过程中直接编辑。关闭后它们会继续跑完。',
         previewUser: '把这段话改写得更简洁一些。',
       },
     };
