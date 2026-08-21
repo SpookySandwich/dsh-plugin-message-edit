@@ -1,4 +1,4 @@
-import { attachParentId, ringFor, rootOf, ancestorChainFromLog, collectFamily } from '../lib/tree-logic.js';
+import { attachParentId, ringFor, rootOf, ancestorChainFromLog, collectFamily, buildTurnTree } from '../lib/tree-logic.js';
 
 function node(id, parentSessionId, targetTurn) {
   return { sessionId: id, parentSessionId, targetTurn, createdAt: 0 };
@@ -208,6 +208,88 @@ check('a ghost chain link still connects survivors into one ring', {
   index: ghostChainRing.index,
 }, { ids: ['A', 'C'], index: 1 });
 
+
+/* ---- turn-level message tree ------------------------------------------- */
+
+// Scenario 1: Root session A (turns 1 & 2), branched session B (edited turn 1 & turn 2).
+const scenario1Versions = [
+  {
+    sessionId: 'A',
+    createdAt: 100,
+    turns: [
+      { turn: 1, text: '今天是周几？', time: 101 },
+      { turn: 2, text: '你怎么知道的？', time: 102 },
+    ],
+  },
+  {
+    sessionId: 'B',
+    parentSessionId: 'A',
+    targetTurn: 1,
+    operation: 'edit',
+    createdAt: 200,
+    turns: [
+      { turn: 1, text: '今天是周几？明天呢？', time: 201 },
+      { turn: 2, text: '啊，感觉不太对', time: 202 },
+    ],
+  },
+];
+
+const tree1 = buildTurnTree(scenario1Versions, 'B');
+check('turn tree has 5 nodes (root + 2 children + 2 leaves)', tree1.length, 5);
+check('root node exists and is origin', {
+  id: tree1[0]?.id,
+  turn: tree1[0]?.turn,
+  isRoot: tree1[0]?.isRoot,
+}, { id: 'A#root', turn: 0, isRoot: true });
+check('turn 1 of A and turn 1 of B both hang off root', {
+  a_t1_parent: tree1.find((n) => n.id === 'A#t1')?.parentId,
+  b_t1_parent: tree1.find((n) => n.id === 'B#t1')?.parentId,
+}, { a_t1_parent: 'A#root', b_t1_parent: 'A#root' });
+check('turn 2 of A hangs off A#t1, turn 2 of B hangs off B#t1', {
+  a_t2_parent: tree1.find((n) => n.id === 'A#t2')?.parentId,
+  b_t2_parent: tree1.find((n) => n.id === 'B#t2')?.parentId,
+}, { a_t2_parent: 'A#t1', b_t2_parent: 'B#t1' });
+check('active path highlights B branch when viewing B', {
+  a_root: tree1.find((n) => n.id === 'A#root')?.onCurrentPath,
+  b_t1: tree1.find((n) => n.id === 'B#t1')?.onCurrentPath,
+  b_t2: tree1.find((n) => n.id === 'B#t2')?.onCurrentPath,
+  a_t1: tree1.find((n) => n.id === 'A#t1')?.onCurrentPath,
+  a_t2: tree1.find((n) => n.id === 'A#t2')?.onCurrentPath,
+}, { a_root: true, b_t1: true, b_t2: true, a_t1: false, a_t2: false });
+
+// Scenario 2: Branch at Turn 2
+const scenario2Versions = [
+  {
+    sessionId: 'A',
+    createdAt: 100,
+    turns: [
+      { turn: 1, text: 'Prompt 1', time: 101 },
+      { turn: 2, text: 'Prompt 2', time: 102 },
+      { turn: 3, text: 'Prompt 3', time: 103 },
+    ],
+  },
+  {
+    sessionId: 'C',
+    parentSessionId: 'A',
+    targetTurn: 2,
+    operation: 'edit',
+    createdAt: 300,
+    turns: [
+      { turn: 1, text: 'Prompt 1', time: 101 },
+      { turn: 2, text: 'Edited Prompt 2', time: 301 },
+      { turn: 3, text: 'Prompt 3 in C', time: 302 },
+    ],
+  },
+];
+const tree2 = buildTurnTree(scenario2Versions, 'C');
+check('turn 2 of C branches off A#t1', tree2.find((n) => n.id === 'C#t2')?.parentId, 'A#t1');
+check('turn 3 of C hangs off C#t2', tree2.find((n) => n.id === 'C#t3')?.parentId, 'C#t2');
+check('turn 2 of A hangs off A#t1', tree2.find((n) => n.id === 'A#t2')?.parentId, 'A#t1');
+
+// Scenario 3: Empty versions
+check('empty versions produces empty tree', buildTurnTree([], 'A'), []);
+
 console.log(`
 ${failed === 0 ? 'all passed' : failed + ' failed'}`);
 process.exit(failed === 0 ? 0 : 1);
+

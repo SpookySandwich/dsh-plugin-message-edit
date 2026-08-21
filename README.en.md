@@ -10,14 +10,23 @@ Edit a message you already sent and the conversation **rewinds and branches** fr
 
 ![demo](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-edit/master/assets/demo.gif)
 
+## Version Tree Visualization
+
+No matter how deeply conversations diverge or how many times prompts are edited, the **Versions** tab projects a clear, turn-level branching hierarchy with real-time active path highlights and instant navigation:
+
+![Version Tree](https://raw.githubusercontent.com/SpookySandwich/dsh-plugin-message-edit/master/assets/tree-demo.png)
+
 ## What it does
 
 - **Edit and branch.** Revise a past prompt and send: a new branch regenerates from the full context *before* that turn. This is a true rewind, not a fork that continues from the end.
-- **Version counter.** When a message has alternatives, `‹ n/m ›` appears beneath it. The arrows move between them.
+- **Version counter.** When a message has alternatives, `‹ n/m ›` appears beneath it. The arrows move between them instantaneously.
 - **Version tree.** A **Versions** tab lays the branches out as a graph you can pan, zoom and drag. The current path is highlighted; click any node to jump to that conversation.
+- **Zero-flicker instant switching.** Family-aware SWR client caching enables 0ms version switching and graph navigation without indicator flicker or loading delays.
+- **In-memory host caching.** Parsed turns and version metadata are cached in host memory, eliminating redundant disk I/O and JSON parsing for deep branching trees.
+- **Automatic cancellation.** Branching immediately cancels any still-streaming obsolete sibling turns across the conversation family to save tokens and compute.
 - **Retry.** Re-run a turn without editing it (Claude layout).
 - **Copy.** Put the message text on the clipboard.
-- **Durable.** Every branch is a real session, and the version links are persisted events, so the tree survives a restart. Branches stay out of the session list — twenty edits still look like one conversation.
+- **Durable.** Every branch is a real persisted session, and version links are stored as durable events so the tree survives restarts. New branches automatically group into the parent session's workspace.
 
 ## Interface style
 
@@ -52,6 +61,13 @@ The host-side branching logic derives from [dsh-message-edit](https://github.com
 
 The names are similar, so to be explicit: this is a separate plugin. Its route, cordis id and durable event type keep a distinct `message-tree` spelling precisely so both can be installed side by side without colliding.
 
+## Documentation
+
+For technical details and developer guides, see:
+- [Architecture Overview](docs/ARCHITECTURE.md): Host/client architecture, Cordis lifecycle injection, durable event storage, and HTTP API.
+- [Tree Data Model & Algorithms](docs/TREE_DATA_MODEL.md): Turn-level message tree projection, sibling fan-out, ghost recovery, and active path calculation.
+- [Development & Testing Guide](docs/DEVELOPMENT.md): Build pipeline, automated test suite, and local installation instructions.
+
 ## Compatibility
 
 Coexists with [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream) and [dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout).
@@ -59,3 +75,4 @@ Coexists with [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-p
 ## License
 
 MIT © SpookySandwich. Portions of the host half derive from dsh-message-edit (MIT © Moeblack).
+

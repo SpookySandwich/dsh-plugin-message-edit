@@ -209,18 +209,27 @@ function useStyle() {
 
 /* ------------------------------------------------------- timeline store -- */
 
-// One cached tree per session, shared by bubbles and the Versions view.
+const MAX_CACHED_SESSIONS = 500;
+const MAX_CACHED_ROOTS = 50;
+
+// High-performance family-aware tree cache with zero-flicker Stale-While-Revalidate.
 const treeStore = {
   bySession: new Map(),
+  byRoot: new Map(),
+  inflight: new Map(),
   listeners: [],
+
   get(sessionId) {
+    if (!sessionId) return null;
     return this.bySession.get(sessionId) || null;
   },
+
   notify() {
     for (let i = 0; i < this.listeners.length; i++) {
       try { this.listeners[i](); } catch (e) {}
     }
   },
+
   subscribe(fn) {
     const listeners = this.listeners;
     listeners.push(fn);
@@ -229,28 +238,105 @@ const treeStore = {
       if (at !== -1) listeners.splice(at, 1);
     };
   },
+
+  _prune() {
+    while (this.bySession.size > MAX_CACHED_SESSIONS) {
+      const oldestKey = this.bySession.keys().next().value;
+      this.bySession.delete(oldestKey);
+    }
+    while (this.byRoot.size > MAX_CACHED_ROOTS) {
+      const oldestKey = this.byRoot.keys().next().value;
+      this.byRoot.delete(oldestKey);
+    }
+  },
+
+  setTree(sessionId, versions, timestamp) {
+    if (!Array.isArray(versions)) versions = [];
+    const rootId = rootOf(versions, sessionId) || sessionId;
+    const updatedAt = typeof timestamp === 'number' ? timestamp : Date.now();
+    const existingRoot = this.byRoot.get(rootId);
+    if (existingRoot && (existingRoot.updatedAt || 0) > updatedAt) {
+      return;
+    }
+
+    const entry = { versions: versions, rootId: rootId, loading: false, error: null, updatedAt: updatedAt };
+    this.byRoot.set(rootId, entry);
+
+    for (let i = 0; i < versions.length; i++) {
+      const v = versions[i];
+      if (v && v.sessionId && !v.deleted) {
+        this.bySession.set(v.sessionId, entry);
+      }
+    }
+    this.bySession.set(sessionId, entry);
+    this._prune();
+    this.notify();
+  },
+
   async load(sessionId) {
+    if (!sessionId) return;
     const g = realGlobal();
     if (!g || typeof g.fetch !== 'function') return;
-    const entry = this.bySession.get(sessionId);
-    if (entry && entry.loading) return;
-    this.bySession.set(sessionId, Object.assign({ versions: null }, entry, { loading: true }));
-    try {
-      const res = await g.fetch(ROUTE + '?sessionId=' + encodeURIComponent(sessionId), { cache: 'no-store' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      this.bySession.set(sessionId, { versions: data.versions, loading: false, error: null });
-    } catch (e) {
-      this.bySession.set(sessionId, { versions: null, loading: false, error: String(e && e.message || e) });
+
+    if (this.inflight.has(sessionId)) return this.inflight.get(sessionId);
+
+    const existing = this.bySession.get(sessionId);
+    const reqTime = Date.now();
+    if (existing) {
+      this.bySession.set(sessionId, Object.assign({}, existing, { loading: true }));
+    } else {
+      this.bySession.set(sessionId, { versions: null, loading: true, error: null, updatedAt: 0 });
     }
-    this.notify();
+
+    const self = this;
+    const promise = (async function () {
+      try {
+        const res = await g.fetch(ROUTE + '?sessionId=' + encodeURIComponent(sessionId), { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        self.setTree(sessionId, data.versions, reqTime);
+      } catch (e) {
+        const errStr = String((e && e.message) || e);
+        const prev = self.bySession.get(sessionId);
+        self.bySession.set(sessionId, {
+          versions: prev ? prev.versions : null,
+          loading: false,
+          error: errStr,
+          updatedAt: prev ? prev.updatedAt : 0,
+        });
+        self.notify();
+      } finally {
+        self.inflight.delete(sessionId);
+      }
+    })();
+
+    this.inflight.set(sessionId, promise);
+    return promise;
   },
+
   ensure(sessionId) {
-    if (!this.bySession.has(sessionId)) this.load(sessionId);
+    if (!sessionId) return;
+    const entry = this.bySession.get(sessionId);
+    if (!entry || !entry.versions) {
+      this.load(sessionId);
+    } else if (Date.now() - (entry.updatedAt || 0) > 8000 && !entry.loading) {
+      this.load(sessionId);
+    }
   },
-  invalidate() {
-    this.bySession.clear();
-    this.notify();
+
+  invalidate(sessionId) {
+    if (sessionId) {
+      const entry = this.bySession.get(sessionId);
+      if (entry && entry.rootId) {
+        const rootEntry = this.byRoot.get(entry.rootId);
+        if (rootEntry) rootEntry.updatedAt = 0;
+      }
+      this.load(sessionId);
+    } else {
+      this.bySession.forEach(function (e) { if (e) e.updatedAt = 0; });
+      this.byRoot.forEach(function (e) { if (e) e.updatedAt = 0; });
+      this.notify();
+    }
   },
 };
 
@@ -315,6 +401,23 @@ function ringFor(versions, sessionId, turn) {
 }
 
 /* ------------------------------------------------------------ mutations -- */
+
+/**
+ * Open a version, unarchiving it first when needed. The app cannot navigate
+ * to an archived session (it bounces to the workspace picker), so an archived
+ * target is activated through the host route before opening. Ghosts (deleted
+ * versions) are never openable.
+ */
+async function openVersionTarget(sessions, v) {
+  if (!v || v.deleted || !sessions) return;
+  if (v.archived) {
+    try {
+      await mutate({ action: 'activate', sessionId: v.sessionId });
+      treeStore.invalidate();
+    } catch (e) {}
+  }
+  openWhenListed(sessions, v.sessionId);
+}
 
 function openWhenListed(sessions, sessionId) {
   const list = sessions.list;
@@ -393,52 +496,213 @@ const SLOT_X = 206;
 const SLOT_Y = 132;
 
 /**
- * Tidy tree layout: leaves claim successive horizontal slots, parents center
- * over their children, siblings ordered by creation time.
+ * Project conversation family versions into a turn-level branching tree.
  */
-function layoutVersions(versions) {
+function buildTurnTree(versions, currentSessionId) {
+  if (!versions || versions.length === 0) return [];
   const byId = new Map(versions.map(function (v) { return [v.sessionId, v]; }));
-  const children = new Map();
-  const roots = [];
+
+  let rootVersion = versions.find(function (v) { return !v.parentSessionId; });
+  if (!rootVersion) {
+    const rootId = rootOf(versions, currentSessionId) || (versions[0] && versions[0].sessionId);
+    rootVersion = (rootId && byId.get(rootId)) || versions[0];
+  }
+  const rootSessionId = rootVersion.sessionId;
+
+  const activeSessionPath = new Set();
+  let cursor = byId.get(currentSessionId);
+  const seenSessions = new Set();
+  while (cursor && !seenSessions.has(cursor.sessionId)) {
+    seenSessions.add(cursor.sessionId);
+    activeSessionPath.add(cursor.sessionId);
+    cursor = cursor.parentSessionId ? byId.get(cursor.parentSessionId) : null;
+  }
+
+  const nodes = [];
+  const rootNodeId = rootSessionId + '#root';
+  const nodeMap = new Map();
+
+  const rootNode = {
+    id: rootNodeId,
+    sessionId: rootSessionId,
+    turn: 0,
+    isRoot: true,
+    time: rootVersion.createdAt || 0,
+    current: currentSessionId === rootSessionId && (!rootVersion.turns || rootVersion.turns.length === 0),
+    onCurrentPath: true,
+    deleted: !!rootVersion.deleted,
+    archived: !!rootVersion.archived,
+  };
+  nodes.push(rootNode);
+  nodeMap.set(rootNodeId, rootNode);
+
+  function findParentTurnNodeId(v, turn) {
+    if (!v.parentSessionId) {
+      if (turn === 1) return rootNodeId;
+      return v.sessionId + '#t' + (turn - 1);
+    }
+    if (turn === v.targetTurn) {
+      if (v.targetTurn === 1) return rootNodeId;
+      return v.parentSessionId + '#t' + (v.targetTurn - 1);
+    }
+    return v.sessionId + '#t' + (turn - 1);
+  }
+
   for (let i = 0; i < versions.length; i++) {
     const v = versions[i];
-    if (v.parentSessionId && byId.has(v.parentSessionId)) {
-      if (!children.has(v.parentSessionId)) children.set(v.parentSessionId, []);
-      children.get(v.parentSessionId).push(v);
+    const isCurrentSession = v.sessionId === currentSessionId;
+    const turns = Array.isArray(v.turns) && v.turns.length > 0 ? v.turns : [];
+
+    if (!v.parentSessionId) {
+      for (let j = 0; j < turns.length; j++) {
+        const t = turns[j];
+        const turnNum = t.turn;
+        const turnNodeId = v.sessionId + '#t' + turnNum;
+        const parentId = findParentTurnNodeId(v, turnNum);
+        const node = {
+          id: turnNodeId,
+          sessionId: v.sessionId,
+          turn: turnNum,
+          parentId: parentId,
+          time: t.time || v.createdAt,
+          text: t.text || '',
+          current: isCurrentSession,
+          onCurrentPath: false,
+          deleted: !!v.deleted,
+          archived: !!v.archived,
+        };
+        nodes.push(node);
+        nodeMap.set(turnNodeId, node);
+      }
     } else {
-      roots.push(v);
+      const targetTurn = typeof v.targetTurn === 'number' ? v.targetTurn : 1;
+      const ownTurns = turns.filter(function (t) { return t.turn >= targetTurn; });
+
+      if (ownTurns.length === 0) {
+        const turnNodeId = v.sessionId + '#t' + targetTurn;
+        const parentId = findParentTurnNodeId(v, targetTurn);
+        const node = {
+          id: turnNodeId,
+          sessionId: v.sessionId,
+          turn: targetTurn,
+          parentId: parentId,
+          operation: v.operation || 'edit',
+          text: v.after || v.before || '',
+          time: v.createdAt || 0,
+          current: isCurrentSession,
+          onCurrentPath: false,
+          deleted: !!v.deleted,
+          archived: !!v.archived,
+        };
+        nodes.push(node);
+        nodeMap.set(turnNodeId, node);
+      } else {
+        for (let j = 0; j < ownTurns.length; j++) {
+          const t = ownTurns[j];
+          const turnNum = t.turn;
+          const turnNodeId = v.sessionId + '#t' + turnNum;
+          const parentId = findParentTurnNodeId(v, turnNum);
+          const isForkTurn = turnNum === targetTurn;
+          const node = {
+            id: turnNodeId,
+            sessionId: v.sessionId,
+            turn: turnNum,
+            parentId: parentId,
+            operation: isForkTurn ? v.operation : undefined,
+            text: t.text || (isForkTurn ? (v.after || v.before || '') : ''),
+            time: t.time || v.createdAt,
+            current: isCurrentSession,
+            onCurrentPath: false,
+            deleted: !!v.deleted,
+            archived: !!v.archived,
+          };
+          nodes.push(node);
+          nodeMap.set(turnNodeId, node);
+        }
+      }
+    }
+  }
+
+  const allIds = new Set(nodes.map(function (n) { return n.id; }));
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].parentId && !allIds.has(nodes[i].parentId)) {
+      nodes[i].parentId = rootNodeId;
+    }
+  }
+
+  const activePathIds = new Set();
+  let latestNode = null;
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.sessionId === currentSessionId) {
+      if (!latestNode || (n.turn || 0) >= (latestNode.turn || 0)) {
+        latestNode = n;
+      }
+    }
+  }
+  let pathCursor = latestNode || nodes[0];
+  const seenPath = new Set();
+  while (pathCursor && !seenPath.has(pathCursor.id)) {
+    seenPath.add(pathCursor.id);
+    activePathIds.add(pathCursor.id);
+    pathCursor = pathCursor.parentId ? nodeMap.get(pathCursor.parentId) : null;
+  }
+  activePathIds.add(rootNodeId);
+
+  for (let i = 0; i < nodes.length; i++) {
+    nodes[i].onCurrentPath = activePathIds.has(nodes[i].id);
+  }
+
+  return nodes;
+}
+
+/**
+ * Tidy tree layout for turn nodes: leaves claim successive horizontal slots,
+ * parents center over their children, siblings ordered by creation time.
+ */
+function layoutTurnTree(nodes) {
+  const byId = new Map(nodes.map(function (n) { return [n.id, n]; }));
+  const children = new Map();
+  const roots = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    if (n.parentId && byId.has(n.parentId)) {
+      if (!children.has(n.parentId)) children.set(n.parentId, []);
+      children.get(n.parentId).push(n);
+    } else {
+      roots.push(n);
     }
   }
   children.forEach(function (list) {
-    list.sort(function (a, b) { return a.createdAt - b.createdAt; });
+    list.sort(function (a, b) { return (a.time || 0) - (b.time || 0) || String(a.id).localeCompare(String(b.id)); });
   });
-  roots.sort(function (a, b) { return a.createdAt - b.createdAt; });
+  roots.sort(function (a, b) { return (a.time || 0) - (b.time || 0) || String(a.id).localeCompare(String(b.id)); });
   const pos = new Map();
   let cursor = 0;
-  function walk(v, depth) {
-    const kids = children.get(v.sessionId) || [];
+  function walk(n, depth) {
+    const kids = children.get(n.id) || [];
     if (kids.length === 0) {
-      pos.set(v.sessionId, { x: cursor * SLOT_X, y: depth * SLOT_Y });
+      pos.set(n.id, { x: cursor * SLOT_X, y: depth * SLOT_Y });
       cursor += 1;
       return;
     }
     let lo = Infinity, hi = -Infinity;
     for (let i = 0; i < kids.length; i++) {
       walk(kids[i], depth + 1);
-      const p = pos.get(kids[i].sessionId);
+      const p = pos.get(kids[i].id);
       if (p.x < lo) lo = p.x;
       if (p.x > hi) hi = p.x;
     }
-    pos.set(v.sessionId, { x: (lo + hi) / 2, y: depth * SLOT_Y });
+    pos.set(n.id, { x: (lo + hi) / 2, y: depth * SLOT_Y });
   }
   for (let i = 0; i < roots.length; i++) walk(roots[i], 0);
   const edges = [];
   children.forEach(function (kids, parentId) {
     for (let i = 0; i < kids.length; i++) {
-      edges.push({ from: parentId, to: kids[i].sessionId, onPath: !!kids[i].onCurrentPath });
+      edges.push({ from: parentId, to: kids[i].id, onPath: !!kids[i].onCurrentPath });
     }
   });
-  return { pos: pos, edges: edges, byId: byId };
+  return { pos: pos, edges: edges, byId: byId, nodes: nodes };
 }
 
 function edgePath(x1, y1, x2, y2) {
@@ -517,6 +781,7 @@ const CSS = [
   '.mtx-card[data-current]{border-color:var(--dsw-alias-accent-primary,#4b8dff);box-shadow:0 0 0 1px var(--dsw-alias-accent-primary,#4b8dff),0 6px 24px color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 30%,transparent)}',
   '.mtx-card[data-dragging]{cursor:grabbing;box-shadow:0 14px 34px rgba(0,0,0,.3);z-index:3}',
   '.mtx-card[data-deleted]{opacity:.55;border-style:dashed;cursor:default}',
+  '.mtx-card[data-archived]{opacity:.72}',
   '.mtx-card[data-deleted]:hover{box-shadow:0 2px 10px rgba(0,0,0,.14);border-color:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 30%,transparent)}',
   '.mtx-card-icon{flex:none;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:12px;background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 18%,transparent);color:var(--dsw-alias-label-secondary,#bbb)}',
   '.mtx-card[data-path] .mtx-card-icon{background:color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 20%,transparent);color:var(--dsw-alias-accent-primary,#4b8dff)}',
@@ -586,6 +851,12 @@ return {
     let sessions = null;
     try { sessions = ctx.get('sessions'); } catch (e) {}
 
+    ctx.effect(function () {
+      if (sessions && sessions.list && typeof sessions.list.subscribe === 'function') {
+        return sessions.list.subscribe(function () { treeStore.invalidate(); });
+      }
+    });
+
     // Session-list state straight from the service, so this works no matter
     // what props the host chooses to pass slot components.
     function useSessionList() {
@@ -612,6 +883,7 @@ return {
         retry: 'Retry this turn',
         regen: 'Regenerate from here',
         original: 'Original conversation',
+        turn: 'Turn {turn}',
         edited: 'Edited turn {turn}',
         retried: 'Regenerated turn {turn}',
         branch: 'Branch',
@@ -629,6 +901,7 @@ return {
         styleDesc_deepseek: 'Copy and edit under the bubble, always visible — closest to DSH itself. Cancel and Send sit inside the editor.',
         styleDesc_claude: 'Retry, edit and copy under the bubble, revealed on hover. Cancel and Save sit below the editor.',
         deletedVersion: 'Deleted version',
+        archivedTag: 'Archived',
         rememberPathLabel: 'Remember the version I was viewing',
         rememberPathHint: 'Reopening a conversation returns to the branch you last had open instead of the original. Off means it always opens the first version.',
         stopOnEditLabel: 'Stop the running reply when I edit',
@@ -646,6 +919,7 @@ return {
         retry: '重试本轮',
         regen: '从这里重新生成',
         original: '原始对话',
+        turn: '第 {turn} 轮',
         edited: '编辑了第 {turn} 轮',
         retried: '重新生成第 {turn} 轮',
         branch: '分支',
@@ -663,6 +937,7 @@ return {
         styleDesc_deepseek: '气泡下方为复制与编辑，始终显示——最接近 DSH 原生；「取消 / 发送」位于编辑框内部。',
         styleDesc_claude: '气泡下方为重试、编辑与复制，悬停时显示；「取消 / 保存」位于编辑框下方。',
         deletedVersion: '已删除的版本',
+        archivedTag: '已归档',
         rememberPathLabel: '记住我正在查看的版本',
         rememberPathHint: '重新打开会话时回到上次查看的分支，而不是最初那条。关闭后始终打开第一个版本。',
         stopOnEditLabel: '编辑时中止正在生成的回复',
@@ -721,7 +996,7 @@ return {
       if (!ring) return null;
       const go = function (delta) {
         const next = ring.alternatives[ring.index + delta];
-        if (next && sessions) openWhenListed(sessions, next.sessionId);
+        if (next) openVersionTarget(sessions, next);
       };
       return React.createElement('div', { className: 'mtx-ring' },
         React.createElement('button', {
@@ -781,11 +1056,13 @@ return {
           activePathStore.set(root, root);
           return;
         }
-        // Never chase a branch that no longer exists.
-        if (!versions.some(function (v) { return v.sessionId === remembered; })) return;
+        // Never chase a branch that no longer exists (a deleted branch may
+        // still appear here as a non-openable ghost).
+        const target = versions.find(function (v) { return v.sessionId === remembered; });
+        if (!target || target.deleted) return;
         restoredFamilies.add(root);
         pendingRestore.add(root);
-        if (sessions) openWhenListed(sessions, remembered);
+        openVersionTarget(sessions, target);
       }, [versions, sessionId, sessions, prefs.rememberPath]);
 
       const [editing, setEditing] = React.useState(false);
@@ -822,7 +1099,22 @@ return {
             text: draft,
             stopPrevious: prefs.stopOnEdit,
           });
-          treeStore.invalidate();
+          const currentTree = treeStore.get(sessionId);
+          if (currentTree && Array.isArray(currentTree.versions)) {
+            const newV = {
+              sessionId: result.sessionId,
+              parentSessionId: sessionId,
+              targetTurn: turn,
+              operation: 'edit',
+              createdAt: Date.now(),
+              current: true,
+              onCurrentPath: true,
+              after: draft,
+              turns: [{ turn: turn, text: draft, time: Date.now() }],
+            };
+            treeStore.setTree(result.sessionId, currentTree.versions.concat([newV]));
+          }
+          treeStore.load(result.sessionId);
           setEditing(false);
           if (sessions) openWhenListed(sessions, result.sessionId);
         } catch (e) {
@@ -839,7 +1131,22 @@ return {
           const result = await mutate({
             action: 'retry', sessionId: sessionId, turn: turn, stopPrevious: prefs.stopOnEdit,
           });
-          treeStore.invalidate();
+          const currentTree = treeStore.get(sessionId);
+          if (currentTree && Array.isArray(currentTree.versions)) {
+            const newV = {
+              sessionId: result.sessionId,
+              parentSessionId: sessionId,
+              targetTurn: turn,
+              operation: 'retry',
+              createdAt: Date.now(),
+              current: true,
+              onCurrentPath: true,
+              before: text,
+              turns: [{ turn: turn, text: text, time: Date.now() }],
+            };
+            treeStore.setTree(result.sessionId, currentTree.versions.concat([newV]));
+          }
+          treeStore.load(result.sessionId);
           if (sessions) openWhenListed(sessions, result.sessionId);
         } catch (e) {
           setError(String(e && e.message || e));
@@ -946,10 +1253,14 @@ return {
       const rafRef = React.useRef(0);
       const fittedRef = React.useRef(false);
 
-      const layoutKey = versions.map(function (v) {
-        return v.sessionId + ':' + (v.parentSessionId || '') + ':' + (v.onCurrentPath ? 1 : 0);
+      const turnNodes = React.useMemo(function () {
+        return buildTurnTree(versions, sessionId);
+      }, [versions, sessionId]);
+
+      const layoutKey = turnNodes.map(function (n) {
+        return n.id + ':' + (n.parentId || '') + ':' + (n.onCurrentPath ? 1 : 0);
       }).join('|');
-      const layout = React.useMemo(function () { return layoutVersions(versions); }, [layoutKey]);
+      const layout = React.useMemo(function () { return layoutTurnTree(turnNodes); }, [layoutKey]);
       layoutRef.current = layout;
 
       function applyView() {
@@ -1033,8 +1344,8 @@ return {
           alive.add(id);
           let s = springs.current.get(id);
           if (!s) {
-            const v = lay.byId.get(id);
-            const pp = v && v.parentSessionId ? lay.pos.get(v.parentSessionId) : null;
+            const n = lay.byId.get(id);
+            const pp = n && n.parentId ? lay.pos.get(n.parentId) : null;
             const born = pp || p;
             springs.current.set(id, { x: born.x, y: born.y, vx: 0, vy: 0, tx: p.x, ty: p.y });
           } else {
@@ -1077,11 +1388,13 @@ return {
 
       function openVersion(id) {
         const lay = layoutRef.current;
-        const v = lay && lay.byId.get(id);
-        if (!v || v.deleted || !sessions) return;
-        openWhenListed(sessions, v.sessionId);
+        const node = lay && lay.byId.get(id);
+        if (!node || node.deleted || !sessions) return;
+        const v = versions.find(function (item) { return item.sessionId === node.sessionId; });
+        if (!v) return;
+        openVersionTarget(sessions, v);
         showChat();
-        if (typeof v.targetTurn === 'number') flashTurn(v.sessionId, v.targetTurn, 45);
+        if (typeof node.turn === 'number' && node.turn > 0) flashTurn(node.sessionId, node.turn, 45);
       }
 
       function onPointerDown(ev) {
@@ -1134,12 +1447,12 @@ return {
         }
       }
 
-      function cardTitle(v) {
-        if (v.deleted) return t('deletedVersion');
-        if (!v.parentSessionId) return t('original');
-        if (v.operation === 'edit') return t('edited', { turn: v.targetTurn });
-        if (v.operation === 'retry') return t('retried', { turn: v.targetTurn });
-        return t('branch');
+      function cardTitle(n) {
+        if (n.deleted) return t('deletedVersion');
+        if (n.isRoot) return t('original');
+        if (n.operation === 'edit') return t('edited', { turn: n.turn });
+        if (n.operation === 'retry') return t('retried', { turn: n.turn });
+        return t('turn', { turn: n.turn });
       }
 
       return React.createElement('div', {
@@ -1165,26 +1478,28 @@ return {
               });
             })
           ),
-          versions.map(function (v) {
-            const s = springs.current.get(v.sessionId) || layout.pos.get(v.sessionId) || { x: 0, y: 0 };
-            const summary = titles[v.sessionId];
-            const sub = (v.after !== undefined ? '“' + clip(v.after, 44) + '” · ' : '')
-              + (!v.parentSessionId && summary && summary.displayTitle ? clip(summary.displayTitle, 24) + ' · ' : '')
-              + timeLabel(v.createdAt);
+          layout.nodes.map(function (n) {
+            const s = springs.current.get(n.id) || layout.pos.get(n.id) || { x: 0, y: 0 };
+            const summary = titles[n.sessionId];
+            const sub = (n.archived ? t('archivedTag') + ' · ' : '')
+              + (n.text ? '“' + clip(n.text, 44) + '” · ' : '')
+              + (n.isRoot && !n.text && summary && summary.displayTitle ? clip(summary.displayTitle, 24) + ' · ' : '')
+              + timeLabel(n.time);
             return React.createElement('div', {
-              key: v.sessionId,
+              key: n.id,
               className: 'mtx-card',
-              'data-id': v.sessionId,
-              'data-current': v.current || undefined,
-              'data-path': v.onCurrentPath || undefined,
-              'data-deleted': v.deleted || undefined,
+              'data-id': n.id,
+              'data-current': n.current || undefined,
+              'data-path': n.onCurrentPath || undefined,
+              'data-deleted': n.deleted || undefined,
+              'data-archived': n.archived || undefined,
               style: { transform: 'translate(' + (s.x - CARD_W / 2) + 'px,' + s.y + 'px)' },
-              ref: function (el) { if (el) cardEls.current.set(v.sessionId, el); else cardEls.current.delete(v.sessionId); },
+              ref: function (el) { if (el) cardEls.current.set(n.id, el); else cardEls.current.delete(n.id); },
             },
               React.createElement('span', { className: 'mtx-card-icon' },
-                v.deleted ? '∅' : v.parentSessionId ? (v.operation === 'retry' ? '↻' : '✎') : '●'),
+                n.deleted ? '∅' : n.isRoot ? '●' : (n.operation === 'retry' ? '↻' : (n.operation === 'edit' ? '✎' : '💬'))),
               React.createElement('span', { className: 'mtx-card-main' },
-                React.createElement('span', { className: 'mtx-card-title' }, cardTitle(v)),
+                React.createElement('span', { className: 'mtx-card-title' }, cardTitle(n)),
                 React.createElement('span', { className: 'mtx-card-sub' }, sub)
               )
             );
@@ -1201,7 +1516,7 @@ return {
           }, '↻')
         ),
         tree && tree.error ? React.createElement('div', { className: 'mtx-error' }, tree.error) : null,
-        versions.length <= 1 ? React.createElement('div', { className: 'mtx-empty' }, t('empty')) : null,
+        turnNodes.length <= 1 ? React.createElement('div', { className: 'mtx-empty' }, t('empty')) : null,
         React.createElement('a', {
           className: 'mtx-link',
           href: 'https://github.com/SpookySandwich/dsh-plugin-message-edit',
