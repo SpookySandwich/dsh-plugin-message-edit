@@ -2,6 +2,7 @@
 
 English | [简体中文](README.md)
 
+[![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![dsh](https://img.shields.io/badge/dsh-0.1.0--rc.7-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
