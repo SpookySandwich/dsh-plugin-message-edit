@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-message-edit",
   "version": "1.0.0",
-  "description": "ChatGPT-style message editing for DeepSeek Harness: edit a past prompt to rewind and branch the conversation, switch versions with a counter under the bubble, and see every branch in a version tree. Choose the ChatGPT, DeepSeek or Claude control layout.",
+  "description": "ChatGPT-style message editing for DeepSeek Harness: edit a past prompt to rewind and branch the conversation, switch versions with a counter under the bubble, and browse branches in a tree.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
