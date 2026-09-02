@@ -474,6 +474,16 @@ function imageCount(content) {
   return n;
 }
 
+function imageParts(content) {
+  if (!Array.isArray(content)) return [];
+  const out = [];
+  for (let i = 0; i < content.length; i++) {
+    const block = content[i];
+    if (block && block.type === 'image' && block.attachment) out.push({ attachment: block.attachment });
+  }
+  return out;
+}
+
 function clip(text, max) {
   const t = String(text).replace(/\s+/g, ' ').trim();
   return t.length > max ? t.slice(0, max - 1) + '…' : t;
@@ -1016,6 +1026,7 @@ return {
       const data = node.data || {};
       const text = contentText(data.content);
       const images = imageCount(data.content);
+      const messageImages = imageParts(data.content);
       const sessionId = props.sessionId !== undefined ? props.sessionId : (node.sessionId);
       // location.turn is a turn-group object ({turn, start, end, steps}); the
       // turn number lives one level down.
@@ -1207,7 +1218,12 @@ return {
         React.createElement('div', { className: 'mtx-line' },
           React.createElement('div', { className: 'mtx-bubble' },
             text,
-            images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null
+            // The host renders attachments through its images slot (native
+            // gallery plus lightbox); keep the placeholder only when the slot
+            // owner props do not carry the callback.
+            messageImages.length > 0 && typeof props.renderMessageImages === 'function'
+              ? props.renderMessageImages({ images: messageImages, align: 'end' })
+              : (images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null)
           )
         ),
         // The controls sit under the bubble in all three references. Which
