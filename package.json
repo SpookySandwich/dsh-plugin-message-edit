@@ -49,6 +49,7 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-conversation",
@@ -57,6 +58,7 @@
     }
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
     "jsdom": "^29.1.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

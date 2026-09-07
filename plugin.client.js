@@ -851,6 +851,9 @@ const CSS = [
 ].join('');
 
 return {
+  // Module dependencies load code; Cordis injection waits for its services.
+  // The session controller becomes ready asynchronously after connection.
+  inject: ['slots', 'sessions', 'locale'],
   apply(ctx) {
     const slots = ctx.get('slots');
     if (slots === undefined) {
@@ -860,8 +863,10 @@ return {
     // Reflect the chosen edit style onto <html> now and on every change.
     ctx.effect(function () { syncStyleAttribute(); return styleStore.subscribe(syncStyleAttribute); });
 
-    let sessions = null;
-    try { sessions = ctx.get('sessions'); } catch (e) {}
+    const sessions = ctx.get('sessions');
+    if (!sessions || typeof sessions.open !== 'function') {
+      throw new Error('[dsh-plugin-message-edit] Missing DSH session navigation service. Check client dependencies and restart DSH.');
+    }
 
     ctx.effect(function () {
       if (sessions && sessions.list && typeof sessions.list.subscribe === 'function') {

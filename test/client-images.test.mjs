@@ -12,10 +12,12 @@ const text = value => ({ type: 'text', text: value });
 // Run the shipped bundle and capture the component through its actual slot
 // registration. React and the DOM are real; the host services/gallery are test
 // doubles. This tests delegation and UI transitions, not DSH's image loader.
-async function mount(t, content, renderMessageImages) {
+async function mount(t, content, renderMessageImages, options = {}) {
   const dom = new JSDOM('<!doctype html><html><head></head><body><div id="root"></div></body></html>', {
     url: 'https://message-edit.test/',
   });
+  dom.window.localStorage.setItem('dsh-plugin-message-tree:style', options.style ?? 'chatgpt');
+  dom.window.fetch = async () => ({ ok: true, json: async () => ({ versions: options.versions ?? [] }) });
   const previous = new Map();
   const browserErrors = [];
   dom.window.addEventListener('error', event => browserErrors.push(event.error || event.message));
@@ -60,10 +62,13 @@ async function mount(t, content, renderMessageImages) {
   runInNewContext(bundle, {
     window: dom.window, document: dom.window.document, console,
     setTimeout, clearTimeout,
-    fetch: async () => ({ ok: true, json: async () => ({ versions: [] }) }),
   }, { filename: 'lib/client.js' });
   plugin.apply({
-    get(name) { return name === 'slots' ? slots : undefined; },
+    get(name) { return name === 'slots' ? slots : name === 'sessions' ? {
+      open: options.open ?? (() => {}),
+      list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: Object.fromEntries(
+        ['session-test', ...(options.versions ?? []).map(version => version.sessionId)].map(id => [id, { id }])) }) },
+    } : undefined; },
     effect(fn) { const dispose = fn(); if (typeof dispose === 'function') disposers.push(dispose); },
   });
   assert.equal(typeof component, 'function', 'The user-message slot must register');
@@ -148,3 +153,16 @@ test('editing keeps the attachment notice and cancelling restores the host galle
   assert.equal(doc.querySelector('textarea'), null);
   assert.equal(doc.querySelector('img')?.alt, 'one');
 });
+
+  test('version navigation opens the selected sibling', async t => {
+    const opened = [];
+    const doc = await mount(t, [text('Hello')], gallery([]), { open: id => opened.push(id), versions: [
+      { sessionId: 'session-test', createdAt: 1 },
+      { sessionId: 'sibling', parentSessionId: 'session-test', targetTurn: 1, createdAt: 2 },
+    ] });
+    const ring = doc.querySelector('.mtx-ring');
+    assert.ok(ring, 'Version navigation must render');
+    assert.match(ring.textContent, /1\/2/);
+    await act(async () => ring.querySelectorAll('button')[1].click());
+    assert.deepEqual(opened, ['sibling']);
+  });

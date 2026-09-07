@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
+import { Context } from '@deepseek-ai/cordis';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const bundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8');
@@ -26,7 +27,8 @@ test('declared client dependencies make the UI services available for registrati
     register: spec => { registered.push(spec.name); return () => {}; },
   };
   plugin.apply({
-    get: name => name === 'slots' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-slots') ? slots : undefined,
+    get: name => name === 'slots' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-slots') ? slots
+      : name === 'sessions' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-api-session-controller') ? { open() {} } : undefined,
     effect: fn => fn(),
   });
   assert.deepEqual(registered, ['settings.section', 'conversation.chat.node', 'conversation.view']);
@@ -35,6 +37,26 @@ test('declared client dependencies make the UI services available for registrati
 test('a missing slots service fails visibly instead of silently disabling the module', () => {
   const { plugin } = load();
   assert.throws(() => plugin.apply({ get: () => undefined }), /Missing DSH slots service.*inject/);
+});
+
+test('Cordis waits for the asynchronous session service before applying the client', async t => {
+  const { plugin } = load();
+  const ctx = new Context();
+  t.after(() => ctx.fiber.dispose());
+  const registered = [];
+  ctx.provide('slots', {
+    inject: (_name, register) => register(),
+    register: spec => { registered.push(spec.name); return () => {}; },
+  });
+  ctx.provide('locale', {});
+  const fiber = ctx.plugin(plugin);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fiber.state, 0, 'Client remains pending until the session controller is ready');
+  assert.deepEqual(registered, []);
+  ctx.provide('sessions', { open() {} });
+  await fiber;
+  assert.equal(fiber.state, 2);
+  assert.deepEqual(registered, ['settings.section', 'conversation.chat.node', 'conversation.view']);
 });
 
 test('a user-renderer collision is reported while the other UI entries still register', () => {
@@ -48,7 +70,7 @@ test('a user-renderer collision is reported while the other UI entries still reg
         registered.push(spec.name);
         return () => {};
       },
-    } : undefined,
+    } : name === 'sessions' ? { open() {} } : undefined,
     effect: fn => fn(),
   });
   assert.deepEqual(registered, ['settings.section', 'conversation.view']);
