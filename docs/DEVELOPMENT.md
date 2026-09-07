@@ -59,6 +59,11 @@ fresh checkout before running tests (Node 22.19+ or Node 24).
   and checks image delegation, multiple/image-only messages, old-host fallback,
   text-only messages, and entering/cancelling an edit. Host services and the image
   gallery are test doubles; these are not full DSH integration tests.
+- `test/client-registration.test.mjs`: checks module dependencies and visible
+  failures when services or registrations are unavailable.
+- `test/session-record.test.mjs` and `test/host-compatibility.test.mjs`: cover
+  legacy/current session shapes, live/resumed edit requests, retained images,
+  retry ancestry, nested version markers, and cache invalidation.
 
 GitHub Actions runs these checks for pull requests and branch pushes, on
 Linux (Node 22 and 24) and Windows (Node 22). It also runs:
@@ -84,6 +89,29 @@ survive an edit submission. CI's gallery double cannot verify native image
 loading, lightbox behavior, or compatibility with DSH's module injection.
 
 To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit/test/tree.test.mjs).
+
+### Optional real DSH acceptance
+
+`test/fixtures/dsh-acceptance.mjs` is an offline model adapter and live/cold
+session fixture for an installed official DSH `0.1.2-rc.1` runtime. Mount it
+only in a new temporary home whose name contains `message-edit-dsh-qa-`.
+Set `DSH_HOME` to that home and `DSH_QA_MODULES` to the official runtime's
+`node_modules` directory. Use a separate Web profile with the base/Web bundles,
+a built copy of this plugin, and a loader entry for the fixture. Never point
+this fixture at an existing user's DSH home.
+
+Once the isolated server prints its URL, run:
+
+```bash
+node scripts/verify-dsh-acceptance.mjs http://127.0.0.1:61587
+```
+
+The verifier exercises real HTTP edit/retry operations, local model execution,
+image retention, unchanged source messages, and nested branch markers. Restart
+the same isolated server and repeat to exercise persisted branches. The fixture
+adds `/qa/state` and `/qa/followup` endpoints solely for this disposable test.
+Browser acceptance additionally checks the settings entry, version switcher,
+thumbnails, and native original-image viewer. No remote API key is needed.
 
 ---
 

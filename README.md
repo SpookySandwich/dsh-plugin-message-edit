@@ -3,8 +3,9 @@
 [English](README.en.md) | 简体中文
 
 [![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
+[![CI](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-0.1.0--rc.7-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![dsh](https://img.shields.io/badge/dsh-0.1.2--rc.1-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 编辑一条已经发出的消息，对话会从那一刻 **真正回溯并分叉**——和 ChatGPT、Claude、DeepSeek 的做法一致。旧版本不会被覆盖：气泡下方出现 `‹ 2/4 ›` 计数，「版本」标签页则画出整棵树。
@@ -71,9 +72,12 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
+`1.0.1` 已在 DSH `0.1.2-rc.1` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
+
+兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。DSH 仍在快速迭代，尚未验证的后续版本不在此保证范围内。更新插件后请重启 DSH。
+
 可与 [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream)、[dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout) 共存。
 
 ## 许可
 
 MIT © SpookySandwich。宿主端部分逻辑源自 dsh-message-edit（MIT © Moeblack）。
-

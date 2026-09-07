@@ -3,8 +3,9 @@
 English | [简体中文](README.md)
 
 [![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
+[![CI](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-0.1.0--rc.7-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![dsh](https://img.shields.io/badge/dsh-0.1.2--rc.1-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 Edit a message you already sent and the conversation **rewinds and branches** from that point, the way ChatGPT, Claude and DeepSeek all do it. The old version is not overwritten — a `‹ 2/4 ›` counter appears under the bubble, and a Versions tab draws the whole tree.
@@ -71,9 +72,16 @@ For technical details and developer guides, see:
 
 ## Compatibility
 
+Version `1.0.1` has been verified in an isolated DSH `0.1.2-rc.1` Web environment:
+plugin loading, images, edit/retry, nested branches, and restored sessions. Model
+responses use a local test adapter; remote model services were not exercised.
+
+The compatibility layer retains the older `events` / `seedLength` interfaces,
+covered by automated tests. Later DSH releases need separate verification.
+Restart DSH after updating the plugin.
+
 Coexists with [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream) and [dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout).
 
 ## License
 
 MIT © SpookySandwich. Portions of the host half derive from dsh-message-edit (MIT © Moeblack).
-

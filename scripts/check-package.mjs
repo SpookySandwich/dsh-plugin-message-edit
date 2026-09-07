@@ -20,7 +20,7 @@ try {
   const syntax = spawnSync(process.execPath, ['--check', join(root, pkg.main)], { encoding: 'utf8' });
   assert.equal(syntax.status, 0, syntax.error?.message || syntax.stderr);
   const required = new Set([
-    pkg.main, 'lib/client.js', 'lib/tree-logic.js', 'plugin.client.js',
+    pkg.main, 'lib/client.js', 'lib/tree-logic.js', 'lib/session-record.js', 'plugin.client.js',
     'cordis.patch.yml', 'package.json', 'LICENSE',
     ...Object.values(pkg.exports).map(entry => typeof entry === 'string' ? entry : entry.default),
   ]);

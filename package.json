@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-message-edit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "ChatGPT-style message editing for DeepSeek Harness: edit a past prompt to rewind and branch the conversation, switch versions with a counter under the bubble, and browse branches in a tree.",
   "type": "module",
   "main": "lib/index.js",
@@ -48,10 +48,17 @@
     },
     "client": {
       "platform": "web",
-      "inject": []
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-modules"
+      ]
     }
   },
   "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
     "jsdom": "^29.1.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
