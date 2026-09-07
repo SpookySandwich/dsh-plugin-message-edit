@@ -853,7 +853,9 @@ const CSS = [
 return {
   apply(ctx) {
     const slots = ctx.get('slots');
-    if (slots === undefined) return;
+    if (slots === undefined) {
+      throw new Error('[dsh-plugin-message-edit] Missing DSH slots service. Check dsh.client.inject and restart DSH.');
+    }
     ctx.effect(function () { return styles.insert(CSS); });
     // Reflect the chosen edit style onto <html> now and on every change.
     ctx.effect(function () { syncStyleAttribute(); return styleStore.subscribe(syncStyleAttribute); });
@@ -966,7 +968,9 @@ return {
         ctx.effect(function () { return locale.register(I18N_NS, I18N); });
         t = locale.bind(I18N_NS);
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[dsh-plugin-message-edit] Failed to register translations; using English.', e);
+    }
 
     function PencilIcon() {
       return React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
@@ -1619,14 +1623,12 @@ return {
       );
     }
 
-    try {
-      slots.inject('settings.section', function () {
-        return slots.register(
-          { name: 'settings.section', id: 'message-tree', order: 210, label: function () { return t('nav'); } },
-          StyleSettings
-        );
-      });
-    } catch (e) {}
+    slots.inject('settings.section', function () {
+      return slots.register(
+        { name: 'settings.section', id: 'message-tree', order: 210, label: function () { return t('nav'); } },
+        StyleSettings
+      );
+    });
 
     // Shadow only the plain user bubble; steering and context rows keep the
     // host renderer. A collision with another user-bubble plugin degrades to
@@ -1638,6 +1640,7 @@ return {
           UserMessageView
         );
       } catch (e) {
+        console.warn('[dsh-plugin-message-edit] Failed to register the user-message view; editing is unavailable.', e);
         return function () {};
       }
     });

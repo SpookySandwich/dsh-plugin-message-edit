@@ -27,6 +27,12 @@ Because DSH session event logs are append-only without native in-session branchi
 
 ### 1.1 Host Half (`lib/index.js`)
 - Runs in the Node.js backend process via Cordis lifecycle injection.
+- Normalizes DSH sessions through `lib/session-record.js`: current live sessions
+  expose `snapshotEvents()`, query snapshots carry their header in `session`,
+  and older records expose `events` / `header`. Invalid logs fail explicitly.
+- Current DSH branches use `meta.isSeeded` plus `inheritedEventCount`; older
+  hosts use `meta.seedLength`. The normalized inherited cut prevents a nested
+  branch from mistaking an inherited version marker for its own marker.
 - Registers the `/message-tree` HTTP route on `ctx.webServer`.
 - Owns branch creation transactions (`POST /message-tree`):
   1. Truncates parent events up to the target turn.
@@ -129,8 +135,10 @@ Performs branch creation or reactivation.
 
 1. **Host-Side Parsed Session Cache (`sessionParsedCache`)**:
    - Parses turn boundaries (`extractTurns`) and version headers once per immutable event sequence.
-   - Bounded to 500 session entries with key invalidation on live event count / disk mtime changes.
-   - Subsequent `tree()` queries across siblings in the family hit in-memory cache in sub-millisecond time.
+   - Bounded to 500 entries per plugin context. Live keys use session identity
+     and event count; unchanged modern logs do not need a new snapshot.
+   - Cold logs are read before comparing their event count. Creation timestamps
+     cannot invalidate append-only history and must not be used as revisions.
 
 2. **Client-Side Family SWR Store (`treeStore`)**:
    - Maps every non-deleted branch in a tree to the shared family structure upon fetch.
