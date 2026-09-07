@@ -37,7 +37,10 @@
   ],
   "scripts": {
     "build": "node scripts/build-client.mjs",
-    "test": "node scripts/build-client.mjs --check && node test/tree.test.mjs"
+    "pretest": "npm run build",
+    "test": "node scripts/build-client.mjs --check && node --test test/*.test.mjs",
+    "prepack": "npm run build",
+    "check:package": "node scripts/check-package.mjs"
   },
   "dsh": {
     "bundle": {
@@ -47,5 +50,10 @@
       "platform": "web",
       "inject": []
     }
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   }
 }

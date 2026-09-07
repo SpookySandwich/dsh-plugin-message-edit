@@ -49,7 +49,39 @@ The project includes an automated test suite verifying tree construction, siblin
 ```bash
 npm test
 ```
-Runs the build check and executes `test/tree.test.mjs`.
+Automatically builds the client first, checks that it matches the source, then
+runs the Node test runner. Install development dependencies with `npm ci` on a
+fresh checkout before running tests (Node 22.19+ or Node 24).
+
+- `test/tree.test.mjs`: 36 assertions covering branch and version-tree behavior.
+- `test/client-images.test.mjs`: loads the generated client through its module
+  loader, mounts its registered user-message component using React and jsdom,
+  and checks image delegation, multiple/image-only messages, old-host fallback,
+  text-only messages, and entering/cancelling an edit. Host services and the image
+  gallery are test doubles; these are not full DSH integration tests.
+
+GitHub Actions runs these checks for pull requests and branch pushes, on
+Linux (Node 22 and 24) and Windows (Node 22). It also runs:
+
+```bash
+npm run check:package
+```
+
+This creates a real npm archive in a temporary directory, verifies that runtime
+entry points are present and development-only directories are absent, checks
+the host entry's syntax, and removes the temporary archive. `npm pack` and
+`npm publish` now build the client automatically through `prepack`, preventing
+an old or missing generated client from being shipped.
+
+The workflow needs to be pushed to GitHub to run there. Making its checks
+mandatory before merging is a separate repository ruleset/branch-protection
+setting; adding the workflow alone does not block the Merge button.
+
+Before accepting an image-rendering change, also check it in a running DSH:
+send text with one/multiple images and an image-only message, open an image in
+the native viewer, enter/cancel an edit, then verify the original attachments
+survive an edit submission. CI's gallery double cannot verify native image
+loading, lightbox behavior, or compatibility with DSH's module injection.
 
 To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit/test/tree.test.mjs).
 

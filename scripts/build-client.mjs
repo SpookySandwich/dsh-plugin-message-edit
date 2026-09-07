@@ -57,5 +57,6 @@ if (process.argv.includes('--check')) {
   console.log('lib/client.js is up to date');
 } else {
   writeFileSync(target, out);
-  console.log(`wrote lib/client.js (${out.length} bytes)`);
+  // Keep lifecycle diagnostics off stdout so `npm pack --json` stays parseable.
+  console.error(`wrote lib/client.js (${out.length} bytes)`);
 }
