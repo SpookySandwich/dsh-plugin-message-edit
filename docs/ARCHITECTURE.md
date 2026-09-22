@@ -42,14 +42,25 @@ Because DSH session event logs are append-only without native in-session branchi
   3. Creates the agent and clears both inherited inbox queues in its setup,
      before publication can schedule the rewound original input.
   4. Flushes the branch and submits the edited prompt exactly once.
+- Admits an edited message's attachment set before any of that: `POST /message-tree`
+  may carry an ordered `attachments` array. Durable references pass through, a
+  staged file receipt resolves against the source Agent
+  (`ctx.fileUploads.resolve`), and a newly added image arrives in the composer's
+  own wire form and goes through `ctx.attachments.admitPromptContent`. An omitted
+  array keeps the original attachments, which is what an older client sends.
+  Attachment blocks are rebuilt immediately before the edited text block.
 - Owns graph queries (`GET /message-tree?sessionId=...`):
   - Traverses the session family DAG.
   - Recovers deleted/ghost ancestors from surviving descendants' event logs.
   - Extracts turn event boundaries for turn-level rendering.
+- Resolves one stored file attachment to its host path (`GET /message-tree/attachment`), passing the session log's own reference through the attachment store, which validates the digest and the display name and refuses anything it did not write.
 
 ### 1.2 Client Half (`plugin.client.js`)
 - Runs in the browser / renderer process.
 - Injects a shadowed `user` message renderer at priority `-1` to add the edit/copy/retry toolbar and `‹ n/m ›` version ring without modifying agent responses, tool calls, or reasoning blocks.
+- Because the shadowed row *replaces* the host's bubble, it also owns content rendering: an attachment row above the bubble mirrors the host's `contentParts` layout — image runs go through the host's `conversation.message.images` slot, each `file` block becomes a card built from the platform-seeded `@deepseek-ai/dsh-client-ui-primitives` atoms, and any block type it does not recognize falls back to the host's `JsonBlock` instead of disappearing.
+- Its edit box owns the message's attachment set in its own chips (file cards reusing the transcript metrics, 64px image thumbnails, a remove button each, a paperclip and a scoped drop target for additions). The host's own draft rail cannot be rendered from here: `conversation.input.attachments` is declared by the composer's entry, and the slots registry lets exactly one entry declare a child slot, so a second declaration throws. Existing images resolve their URL through the `loadImage` prop the host passes down; picked files upload in the background through the client `fileUpload` service; submit sends the resulting ordered set.
+- Transcript file cards are buttons: clicking one asks the host half to resolve the durable reference to its stored host path (`GET /message-tree/attachment`), then hands the sidebar the same `dsh-resource://file/session/<id>/<path>` address the harness builds for its own file cards (`sessionFileAddress`). The right sidebar's document preview — text, code, PDF, images — reads that path through the composed filesystem, which is not confined to the workspace, so an attachment outside the session cwd opens normally.
 - Adds the **Versions** tab (`VIEW_ORDER: 16`) providing an interactive pan/zoom graph with spring physics.
 - Adds settings options in **Settings → Message Edit** with live layout switching (ChatGPT, DeepSeek, Claude styles).
 

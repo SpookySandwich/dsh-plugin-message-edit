@@ -23,6 +23,9 @@ No matter how deeply conversations diverge or how many times prompts are edited,
 - **Edit and branch.** Revise a past prompt and send: a new branch regenerates from the full context *before* that turn. This is a true rewind, not a fork that continues from the end.
 - **Version counter.** When a message has alternatives, `‹ n/m ›` appears beneath it. The arrows move between them instantaneously.
 - **Version tree.** A **Versions** tab lays the branches out as a graph you can pan, zoom and drag. The current path is highlighted; click any node to jump to that conversation.
+- **Attachments stay visible.** Images keep going through DSH's native gallery (with the original-image viewer) and files render as file cards — type icon, name, extension and size — in the order they were sent. Both survive an edit or a branch.
+- **Open a file from the transcript.** Clicking a file card opens the harness's own document preview in the right sidebar (text, code, PDF, image, …), so the attachment can be read without downloading it first.
+- **Edit the attachments too.** Every attachment in the edit box has its own remove button, and the paperclip or a drop adds new ones — background uploads show progress and can be retried, and the branch is generated from the final set.
 - **Zero-flicker instant switching.** Family-aware SWR client caching enables 0ms version switching and graph navigation without indicator flicker or loading delays.
 - **In-memory host caching.** Parsed turns and version metadata are cached in host memory, eliminating redundant disk I/O and JSON parsing for deep branching trees.
 - **Automatic cancellation.** Branching immediately cancels any still-streaming obsolete sibling turns across the conversation family to save tokens and compute.
@@ -72,15 +75,18 @@ For technical details and developer guides, see:
 
 ## Compatibility
 
+Version `1.2.0`: The edit box can now remove and upload attachments — through DSH's own draft-attachment rail and file-upload service — and a user message with a file attachment no longer renders as text alone. The shadowed renderer renders every attachment exactly as the host does, and an unrecognized block type is no longer silently lost.
+
 Version `1.1.0`: Fix seeded edit/retry creation, clear inherited pending input before publication, identify version markers by session ownership, preserve reasoning effort, and read persisted branches through disposable session observations.
 
 The declared host range is `>=0.1.5-rc.2 <0.1.6-0`; the official `0.1.5-rc.2` runtime was verified. DSH `0.1.6` alpha is not claimed compatible. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/dsh-0.1.5.md).
 
-Download the archive from the [GitHub Release](https://github.com/SpookySandwich/dsh-plugin-message-edit/releases/tag/v1.1.0), then run `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.1.0.tgz`.
+Download the archive from the [GitHub Release](https://github.com/SpookySandwich/dsh-plugin-message-edit/releases/tag/v1.2.0), then run `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.2.0.tgz`.
 
-Version `1.1.0` has been verified in an isolated DSH `0.1.5-rc.2` Web environment:
-plugin loading, images, edit/retry, nested branches, and restored sessions. Model
-responses use a local test adapter; remote model services were not exercised.
+Version `1.2.0` has been verified in an isolated DSH `0.1.5-rc.2` Web environment:
+plugin loading, image and file attachments, removing and uploading attachments while
+editing, edit/retry, nested branches, and restored sessions. Model responses use a
+local test adapter; remote model services were not exercised.
 
 The compatibility layer retains the older `events` / `seedLength` interfaces,
 covered by automated tests. Later DSH releases need separate verification.

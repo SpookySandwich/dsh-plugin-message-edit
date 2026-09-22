@@ -12,6 +12,24 @@
 const ROUTE = '/message-tree';
 const VIEW_ORDER = 16;
 
+// Attachment cards reuse the host's own atoms (type icon, extension and size
+// text, JSON inspector). They are platform seed modules of the web shell — the
+// shell seeds react, react-dom, cordis, dsh-client-store, dsh-client-ui-slots,
+// dsh-client-ui-primitives and dsh-client-ui-dockkit into the module table — so a
+// hand-written client fragment may require them, exactly as the host's own
+// dsh-client-ui-chat bundle does. A shell without them degrades to a name-only
+// card instead of dropping the attachment.
+const hostAtoms = (function () {
+  let atoms = null;
+  try { atoms = require('@deepseek-ai/dsh-client-ui-primitives'); } catch (e) { atoms = null; }
+  if (!atoms) return null;
+  const needed = ['FileTypeIcon', 'fileExtension', 'fileSizeText', 'JsonBlock'];
+  for (let i = 0; i < needed.length; i++) {
+    if (typeof atoms[needed[i]] !== 'function') return null;
+  }
+  return atoms;
+})();
+
 function realGlobal() {
   try { if (typeof window !== 'undefined' && window) return window; } catch (e) {}
   try { if (typeof globalThis !== 'undefined' && globalThis) return globalThis; } catch (e) {}
@@ -474,14 +492,205 @@ function imageCount(content) {
   return n;
 }
 
-function imageParts(content) {
-  if (!Array.isArray(content)) return [];
-  const out = [];
+// Attachments in their original block order, mirroring the host's own
+// `contentParts`. Consecutive images collapse into one host-gallery call per run
+// — the shape this plugin has always used — while every file becomes its own
+// card. `others` carries the blocks this renderer does not know (and text blocks
+// with a non-string payload), so nothing is silently dropped; `bareImages` counts
+// image blocks with no attachment, which keep the existing placeholder notice.
+function attachmentParts(content) {
+  const attachments = [];
+  const others = [];
+  let bareImages = 0;
+  if (!Array.isArray(content)) return { attachments: attachments, others: others, bareImages: bareImages };
   for (let i = 0; i < content.length; i++) {
     const block = content[i];
-    if (block && block.type === 'image' && block.attachment) out.push({ attachment: block.attachment });
+    const attachment = block && typeof block === 'object' ? block.attachment : undefined;
+    const attached = attachment !== undefined && attachment !== null;
+    if (block && block.type === 'text' && typeof block.text === 'string') continue;
+    if (block && block.type === 'image') {
+      if (!attached) { bareImages += 1; continue; }
+      const last = attachments[attachments.length - 1];
+      if (last && last.kind === 'image') last.images.push({ attachment: attachment });
+      else attachments.push({ kind: 'image', images: [{ attachment: attachment }] });
+      continue;
+    }
+    if (block && block.type === 'file' && attached) {
+      attachments.push({ kind: 'file', attachment: attachment });
+      continue;
+    }
+    others.push(block);
   }
-  return out;
+  return { attachments: attachments, others: others, bareImages: bareImages };
+}
+
+// The host's own `EXT SIZE` line for one attachment: `LOG 112.1KB`. Shared by the
+// transcript card and the editor's attachment chips.
+function fileMetaText(attachment) {
+  if (hostAtoms === null) return '';
+  const name = typeof attachment.name === 'string' && attachment.name !== '' ? attachment.name : 'file';
+  // Durable references carry `bytes`; a drafted file carries the picked size.
+  const bytes = typeof attachment.bytes === 'number' ? attachment.bytes : attachment.size;
+  return [
+    hostAtoms.fileExtension(name).toUpperCase().slice(0, 8),
+    typeof bytes === 'number' ? hostAtoms.fileSizeText(bytes) : '',
+  ].filter(Boolean).join(' ');
+}
+
+// One file card, matching the host's own markup (`FileTypeIcon` + name +
+// extension/size) and metrics. Without the host atoms it still shows the name.
+// With an `onOpen` handler it becomes the button that opens the file in the
+// sidebar; the host's own card is not clickable.
+function fileCard(attachment, onOpen, label) {
+  const name = typeof attachment.name === 'string' && attachment.name !== '' ? attachment.name : 'file';
+  const meta = fileMetaText(attachment);
+  const children = [
+    hostAtoms === null ? null : React.createElement(hostAtoms.FileTypeIcon, { path: name, className: 'mtx-file-icon' }),
+    React.createElement('span', { className: 'mtx-file-body' },
+      React.createElement('span', { className: 'mtx-file-name' }, name),
+      meta === '' ? null : React.createElement('span', { className: 'mtx-file-meta' }, meta)
+    ),
+  ];
+  if (typeof onOpen !== 'function') return React.createElement('span', { className: 'mtx-file', title: name }, ...children);
+  return React.createElement('button', {
+    type: 'button', className: 'mtx-file', title: name,
+    'data-open-file': attachment.attachmentId,
+    ...label === undefined ? {} : { 'aria-label': label },
+    onClick: function () { onOpen(attachment); },
+  }, ...children);
+}
+
+/**
+ * The `dsh-resource://file/…` address of one absolute path inside a Session.
+ * This mirrors `sessionFileAddress` from `@deepseek-ai/dsh-util-workspace-path`
+ * — the grammar the harness's own file cards open with — because a hand-written
+ * client fragment cannot import that package: it is neither a platform seed word
+ * nor a client module row.
+ * @param sessionId - the Session the path is read in.
+ * @param path - absolute host path, in either separator spelling.
+ * @returns the sidebar resource address.
+ */
+function fileAddress(sessionId, path) {
+  const segment = function (value) { return encodeURIComponent(value).replace(/%3A/gi, ':'); };
+  const normalized = String(path).replace(/\\/g, '/').replace(/^(?:\.\/)+/, '');
+  return 'dsh-resource://file/session/' + segment(sessionId) + '/' + normalized.split('/').map(segment).join('/');
+}
+
+// Fallback for a block type this renderer does not know: the host shows a JSON
+// inspector rather than dropping it. Without the atoms the block still leaves a
+// visible trace.
+function unknownBlock(block, key, label, truncated) {
+  if (hostAtoms === null) return React.createElement('div', { className: 'mtx-block', key: key }, label);
+  return React.createElement('div', { className: 'mtx-block', key: key },
+    React.createElement(hostAtoms.JsonBlock, {
+      label: label,
+      payload: block,
+      truncatedLabel: truncated,
+    })
+  );
+}
+
+/* ------------------------------------------------- editing attachments -- */
+
+// The edit box manages the message's attachments through the host's own draft
+// rail (`conversation.input.attachments`). This keeps only the state the rail
+// needs: one entry per attachment, plus the per-file upload progress the rail
+// renders. Images are encoded on submit; files are uploaded in the background
+// and cited by their staged receipt, exactly as the composer does it.
+
+/** Browser-declared image media types; every other file uploads verbatim. */
+const IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+
+let draftSeq = 0;
+function draftId() {
+  draftSeq += 1;
+  return 'mtx-draft-' + String(draftSeq) + '-' + Date.now().toString(36);
+}
+
+/** The image media type of one picked file, or null when it uploads verbatim. */
+function imageMediaTypeOf(file) {
+  return file && IMAGE_MEDIA_TYPES.indexOf(file.type) !== -1 ? file.type : null;
+}
+
+/** Read one picked file as canonical base64, the wire form image admission takes. */
+function readBase64(blob) {
+  return new Promise(function (resolve, reject) {
+    const reader = new FileReader();
+    reader.onerror = function () { reject(new Error('无法读取所选文件。')); };
+    reader.onload = function () {
+      const result = String(reader.result);
+      const comma = result.indexOf(',');
+      resolve(comma === -1 ? '' : result.slice(comma + 1));
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Release a locally previewed object URL; host URLs are left alone. */
+function revokeDraftUrl(item) {
+  if (item.localPreview !== true) return;
+  try {
+    if (item.previewUrl && item.previewUrl.indexOf('blob:') === 0) URL.revokeObjectURL(item.previewUrl);
+  } catch (e) {}
+}
+
+/** Whether a drag payload carries files at all. */
+function carriesFiles(event) {
+  const transfer = event ? event.dataTransfer : null;
+  if (!transfer || !transfer.types) return false;
+  return Array.prototype.indexOf.call(transfer.types, 'Files') !== -1;
+}
+
+/**
+ * The staged receipt id from one upload answer. The client upload service
+ * answers the raw browser route with a `{ok, value}` result envelope and its
+ * remote fallback with the bare value, so both shapes are accepted — reading
+ * only the bare one silently dropped the receipt, and the submit then carried a
+ * file part with no reference at all.
+ * @param result - the resolved value of `fileUpload.upload(...)`.
+ * @returns the receipt id, or null when the answer carried none.
+ */
+function receiptIdOf(result) {
+  if (result === null || typeof result !== 'object') return null;
+  if (result.ok === false) {
+    const failure = result.error;
+    throw new Error(failure && typeof failure.message === 'string' ? failure.message : '文件上传失败。');
+  }
+  const value = result.value !== null && typeof result.value === 'object' ? result.value : result;
+  return typeof value.receiptId === 'string' && value.receiptId !== '' ? value.receiptId : null;
+}
+
+/**
+ * The message's attachments as rail entries. A durable image needs a URL that
+ * only the host's own loader can mint: `peek` is its synchronous cache and the
+ * caller resolves anything still missing in an effect.
+ * @param content - the user message's content blocks.
+ * @param peek - optional synchronous image-URL lookup for durable references.
+ * @returns ordered draft entries.
+ */
+function draftFromContent(content, peek) {
+  const items = [];
+  if (!Array.isArray(content)) return items;
+  for (const block of content) {
+    if (!block || typeof block !== 'object' || block.attachment === undefined || block.attachment === null) continue;
+    if (block.type === 'file') {
+      items.push({
+        id: draftId(), kind: 'file',
+        file: { name: block.attachment.name ?? '', size: block.attachment.bytes ?? 0 },
+        ref: block.attachment,
+      });
+      continue;
+    }
+    if (block.type === 'image') {
+      const peeked = typeof peek === 'function' ? peek(block.attachment) : undefined;
+      items.push({
+        id: draftId(), kind: 'image', file: { name: block.attachment.name ?? '' },
+        ref: block.attachment,
+        ...peeked === undefined || peeked === null ? {} : { previewUrl: peeked },
+      });
+    }
+  }
+  return items;
 }
 
 function clip(text, max) {
@@ -760,11 +969,42 @@ const CSS = [
   '.mtx-bubble{background:var(--dsw-alias-interactive-bg-hover,rgba(140,140,150,.14));border-radius:16px;padding:10px 16px;font-size:15px;line-height:26px;color:var(--dsw-alias-label-primary);white-space:pre-wrap;overflow-wrap:anywhere}',
   '.mtx-img{font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:4px}',
 
+  // Attachments sit above the bubble, exactly as the host lays them out:
+  // images go through its gallery slot, files become cards with the host's own
+  // icon and its extension/size line.
+  '.mtx-attachments{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:min(85%,720px)}',
+  '.mtx-file{box-sizing:border-box;display:inline-flex;align-items:center;gap:10px;width:240px;min-height:64px;flex:0 0 240px;padding:8px 12px;border:.5px solid var(--dsw-alias-border-l2,#0000001f);border-radius:16px;background:var(--dsw-specific-input-major,transparent)}',
+  // A clickable transcript card: the host's own card is inert, so the button
+  // affordance is ours.
+  '.mtx-file[data-open-file]{font:inherit;color:inherit;text-align:left;cursor:pointer}',
+  '.mtx-file[data-open-file]:hover{background:var(--dsw-alias-interactive-bg-hover);border-color:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 45%,transparent)}',
+  '.mtx-file-icon{flex:none;width:28px;height:28px}',
+  '.mtx-file-body{display:flex;flex-direction:column;flex:1;min-width:0}',
+  '.mtx-file-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-primary);font-size:14px;font-weight:500;line-height:22px}',
+  '.mtx-file-meta{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--dsw-alias-label-tertiary,#00000073);font-size:12px;line-height:15px}',
+  '.mtx-block{margin-top:4px}',
+
   // Inline editor, ChatGPT-style: the bubble grows into an editing surface
   // with Cancel / Send below-right.
   '.mtx-editor{width:min(85%,720px);background:var(--dsw-alias-interactive-bg-hover,rgba(140,140,150,.14));border-radius:16px;padding:12px 16px;display:flex;flex-direction:column;gap:10px}',
   '.mtx-textarea{width:100%;min-height:72px;resize:vertical;border:0;outline:none;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:15px;line-height:26px}',
   '.mtx-editor-actions{display:flex;justify-content:flex-end;gap:8px}',
+  // The editor's attachment area (the host's own draft rail belongs to the
+  // composer entry and cannot be rendered from here): file chips reuse the
+  // transcript card's metrics, images become 64px thumbnails, and both carry a
+  // remove button.
+  '.mtx-attach{display:flex;flex-wrap:wrap;gap:8px;max-width:100%}',
+  '.mtx-file-input{display:none}',
+  '.mtx-editor-actions .mtx-act[data-act="attach"]{margin-right:auto}',
+  '.mtx-remove{flex:none;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:999px;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer}',
+  '.mtx-remove:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
+  '.mtx-file .mtx-remove{margin-left:auto}',
+  '.mtx-retry{border:0;background:transparent;padding:0;text-align:left;cursor:pointer;color:var(--dsw-alias-status-error,#e5484d)}',
+  '.mtx-thumb{position:relative;width:64px;height:64px;border-radius:12px;overflow:hidden;display:grid;place-items:center;border:.5px solid var(--dsw-alias-border-l2,#0000001f);background:var(--dsw-specific-input-major,transparent)}',
+  '.mtx-thumb img{width:100%;height:100%;object-fit:cover;display:block}',
+  '.mtx-thumb-empty{padding:0 4px;text-align:center;font-size:11px;line-height:14px;color:var(--dsw-alias-label-tertiary);overflow-wrap:anywhere}',
+  '.mtx-thumb .mtx-remove{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.55);color:#fff}',
+  '.mtx-thumb .mtx-remove:hover{background:rgba(0,0,0,.75);color:#fff}',
   '.mtx-btn{padding:6px 16px;border-radius:999px;border:1px solid var(--dsw-alias-border-secondary,rgba(128,128,128,.3));background:transparent;font:inherit;font-size:13px;color:var(--dsw-alias-label-primary);cursor:pointer}',
   '.mtx-btn:hover{background:var(--dsw-alias-interactive-bg-hover)}',
   '.mtx-btn[data-primary]{background:var(--dsw-alias-accent-primary,#4b8dff);border-color:transparent;color:#fff}',
@@ -908,6 +1148,16 @@ return {
         fit: 'Center view',
         empty: 'No versions yet — edit any of your messages to branch this conversation. Drag to pan, scroll to zoom.',
         images: '{count} image(s) kept as-is',
+        files: '{count} file(s) kept as-is',
+        attach: 'Add attachment',
+        removeAttachment: 'Remove attachment',
+        uploading: 'Uploading {percent}%',
+        uploadFailed: 'Upload failed — retry',
+        imagePending: 'Image',
+        openFile: 'Open {name}',
+        openUnavailable: 'This surface has no sidebar to open the file in.',
+        extraBlock: 'Additional content',
+        extraTruncated: '… {total} characters in total',
         nav: 'Message Edit',
         styleLabel: 'Edit interface style',
         styleHint: 'Where the message controls sit and which ones appear. Changes apply live.',
@@ -944,6 +1194,16 @@ return {
         fit: '居中显示',
         empty: '还没有版本——编辑任意一条你的消息即可创建分支。拖动平移，滚轮缩放。',
         images: '{count} 张图片将原样保留',
+        files: '{count} 个文件将原样保留',
+        attach: '添加附件',
+        removeAttachment: '移除附件',
+        uploading: '上传中 {percent}%',
+        uploadFailed: '上传失败，点击重试',
+        imagePending: '图片',
+        openFile: '查看 {name}',
+        openUnavailable: '当前界面没有可用的右侧栏，无法打开文件。',
+        extraBlock: '附加内容',
+        extraTruncated: '… 共 {total} 个字符',
         nav: '消息编辑',
         styleLabel: '编辑界面风格',
         styleHint: '消息操作按钮的位置与种类。修改即时生效。',
@@ -1009,6 +1269,22 @@ return {
         }));
     }
 
+    function PaperclipIcon() {
+      return React.createElement('svg', { width: 15, height: 15, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': true },
+        React.createElement('path', {
+          d: 'M10.7 4.4v6.2a2.7 2.7 0 11-5.4 0V4.1a1.8 1.8 0 113.6 0v5.9a.9.9 0 11-1.8 0V4.9',
+          stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+        }));
+    }
+
+    function CloseIcon() {
+      return React.createElement('svg', { width: 11, height: 11, viewBox: '0 0 14 14', fill: 'none', 'aria-hidden': true },
+        React.createElement('path', {
+          d: 'M10.6 4.4L8 7l2.6 2.6-1 1L7 8l-2.6 2.6-1-1L6 7 3.4 4.4l1-1L7 6l2.6-2.6 1 1z',
+          fill: 'currentColor',
+        }));
+    }
+
     /** Ring beneath a bubble: ‹ i/m › switching whole version sessions. */
     function VersionRing(props) {
       const ring = props.ring;
@@ -1035,7 +1311,12 @@ return {
       const data = node.data || {};
       const text = contentText(data.content);
       const images = imageCount(data.content);
-      const messageImages = imageParts(data.content);
+      // Attachments the host would render: images through its gallery, files as
+      // cards, plus any block this renderer does not know. Dropping any of them
+      // is the bug this list exists to prevent.
+      const parts = attachmentParts(data.content);
+      const attachments = parts.attachments;
+      const fileCount = attachments.filter(function (part) { return part.kind === 'file'; }).length;
       const sessionId = props.sessionId !== undefined ? props.sessionId : (node.sessionId);
       // location.turn is a turn-group object ({turn, start, end, steps}); the
       // turn number lives one level down.
@@ -1090,6 +1371,186 @@ return {
       const [busy, setBusy] = React.useState(false);
       const [error, setError] = React.useState(null);
       const [copied, setCopied] = React.useState(false);
+      // Set when opening a file attachment in the sidebar fails.
+      const [openError, setOpenError] = React.useState(null);
+      // Editable attachments: the editor's own entries, the per-file upload
+      // states, and the abortable upload operations behind them.
+      const [editAttachments, setEditAttachments] = React.useState([]);
+      const [uploads, setUploads] = React.useState({});
+      const uploadOps = React.useRef(new Map());
+      const liveAttachments = React.useRef([]);
+      liveAttachments.current = editAttachments;
+      const fileInput = React.useRef(null);
+
+      // A durable image's URL comes from the host's loader; whatever its cache
+      // cannot answer synchronously is resolved once the draft exists.
+      React.useEffect(function () {
+        if (!editing) return undefined;
+        const load = props.loadImage;
+        if (typeof load !== 'function') return undefined;
+        const pending = liveAttachments.current.filter(function (item) {
+          return item.kind === 'image' && item.ref !== undefined && item.previewUrl === undefined;
+        });
+        if (pending.length === 0) return undefined;
+        let live = true;
+        for (const item of pending) {
+          load(item.ref).then(function (url) {
+            if (!live || url === undefined || url === null) return;
+            setEditAttachments(function (current) {
+              return current.map(function (entry) {
+                return entry.id === item.id ? Object.assign({}, entry, { previewUrl: url }) : entry;
+              });
+            });
+          }).catch(function () {});
+        }
+        return function () { live = false; };
+      }, [editing, editAttachments, props.loadImage]);
+
+      // Leaving the bubble must not leave uploads running or object URLs alive.
+      React.useEffect(function () {
+        return function () {
+          for (const controller of uploadOps.current.values()) controller.abort();
+          uploadOps.current.clear();
+          for (const item of liveAttachments.current) revokeDraftUrl(item);
+        };
+      }, []);
+
+      function uploadService() {
+        const service = ctx.get('fileUpload');
+        return service !== undefined && typeof service.upload === 'function' ? service : null;
+      }
+
+      function setUploadState(id, state) {
+        setUploads(function (current) { return Object.assign({}, current, { [id]: state }); });
+      }
+
+      function startUpload(item) {
+        const service = uploadService();
+        if (service === null || sessionId === undefined) {
+          setUploadState(item.id, { status: 'error' });
+          return;
+        }
+        const controller = new AbortController();
+        uploadOps.current.set(item.id, controller);
+        setUploadState(item.id, { status: 'uploading', loaded: 0, total: item.file.size });
+        service.upload(sessionId, item.blob, item.file.name, controller.signal, function (progress) {
+          setUploadState(item.id, {
+            status: 'uploading', loaded: progress.loaded,
+            total: progress.total === undefined ? item.file.size : progress.total,
+          });
+        }).then(function (result) {
+          uploadOps.current.delete(item.id);
+          const receiptId = receiptIdOf(result);
+          if (receiptId === null) throw new Error('文件上传没有返回凭据。');
+          setUploadState(item.id, { status: 'ready', receiptId: receiptId });
+        }).catch(function () {
+          uploadOps.current.delete(item.id);
+          if (controller.signal.aborted) return;
+          setUploadState(item.id, { status: 'error' });
+        });
+      }
+
+      /** Validate one picked or dropped batch and start its uploads. */
+      function addFiles(files) {
+        const picked = Array.prototype.slice.call(files ?? []);
+        if (picked.length === 0) return;
+        const added = [];
+        for (const file of picked) {
+          if (imageMediaTypeOf(file) !== null) {
+            added.push({
+              id: draftId(), kind: 'image', file: { name: file.name }, blob: file,
+              previewUrl: URL.createObjectURL(file), localPreview: true,
+            });
+            continue;
+          }
+          added.push({ id: draftId(), kind: 'file', file: { name: file.name, size: file.size }, blob: file });
+        }
+        setEditAttachments(function (current) { return current.concat(added); });
+        for (const item of added) if (item.kind === 'file') startUpload(item);
+      }
+
+      function removeAttachment(id) {
+        const controller = uploadOps.current.get(id);
+        if (controller !== undefined) {
+          uploadOps.current.delete(id);
+          controller.abort();
+        }
+        for (const item of liveAttachments.current) if (item.id === id) revokeDraftUrl(item);
+        setEditAttachments(function (current) {
+          return current.filter(function (item) { return item.id !== id; });
+        });
+        setUploads(function (current) {
+          const next = Object.assign({}, current);
+          delete next[id];
+          return next;
+        });
+      }
+
+      function retryFile(id) {
+        const item = liveAttachments.current.find(function (entry) { return entry.id === id; });
+        if (item === undefined || item.blob === undefined) return;
+        startUpload(item);
+      }
+
+      /** The edited attachment set in wire form, in the order the rail shows it. */
+      async function attachmentPayloads() {
+        const parts = [];
+        for (const item of liveAttachments.current) {
+          if (item.kind === 'image') {
+            if (item.ref !== undefined) { parts.push({ type: 'image', attachment: item.ref }); continue; }
+            const mediaType = imageMediaTypeOf(item.blob);
+            parts.push({
+              type: 'image', data: await readBase64(item.blob), mediaType: mediaType,
+              ...item.file.name === '' ? {} : { name: item.file.name },
+            });
+            continue;
+          }
+          if (item.ref !== undefined) { parts.push({ type: 'file', attachment: item.ref }); continue; }
+          const upload = uploads[item.id];
+          // A receipt is the only handle the host can resolve; never submit a
+          // file part without one.
+          if (upload === undefined || upload.status !== 'ready' || typeof upload.receiptId !== 'string') {
+            throw new Error('还有附件没有上传完成，请稍候或移除它。');
+          }
+          parts.push({ type: 'file', receiptId: upload.receiptId });
+        }
+        return parts;
+      }
+
+      /** Drop the local draft: abort uploads, release only our own object URLs. */
+      function releaseDrafts() {
+        for (const controller of uploadOps.current.values()) controller.abort();
+        uploadOps.current.clear();
+        for (const item of liveAttachments.current) revokeDraftUrl(item);
+        setEditAttachments([]);
+        setUploads({});
+      }
+
+      /**
+       * Open one stored file attachment in the harness's right sidebar. The
+       * browser cannot name a stored attachment's bytes, so the host half
+       * resolves the reference to its host path and the sidebar's own document
+       * preview (text, code, PDF, …) reads that path.
+       * @param attachment - the durable file reference carried by the message.
+       */
+      async function openAttachment(attachment) {
+        setOpenError(null);
+        try {
+          const sidebar = ctx.get('sidebarRight');
+          if (sidebar === undefined || typeof sidebar.openResource !== 'function') throw new Error(t('openUnavailable'));
+          const query = 'sessionId=' + encodeURIComponent(sessionId)
+            + '&attachmentId=' + encodeURIComponent(String(attachment.attachmentId))
+            + '&name=' + encodeURIComponent(typeof attachment.name === 'string' ? attachment.name : '')
+            + (typeof attachment.bytes === 'number' ? '&bytes=' + encodeURIComponent(String(attachment.bytes)) : '');
+          const response = await realGlobal().fetch(ROUTE + '/attachment?' + query, { cache: 'no-store' });
+          const body = await response.json().catch(function () { return {}; });
+          if (!response.ok) throw new Error(body.error || ('HTTP ' + response.status));
+          if (typeof body.path !== 'string' || body.path === '') throw new Error(t('openUnavailable'));
+          sidebar.openResource(fileAddress(sessionId, body.path));
+        } catch (e) {
+          setOpenError(String((e && e.message) || e));
+        }
+      }
 
       // Editing used to require an idle session, because forking calls
       // `runMaintenance`, which throws while a turn is live. With stopOnEdit the
@@ -1101,6 +1562,12 @@ return {
       function beginEdit() {
         setDraft(text);
         setError(null);
+        setUploads({});
+        const load = props.loadImage;
+        const peek = load !== undefined && typeof load.peek === 'function'
+          ? function (ref) { return load.peek(ref); }
+          : undefined;
+        setEditAttachments(draftFromContent(data.content, peek));
         setEditing(true);
       }
 
@@ -1111,12 +1578,16 @@ return {
         setBusy(true);
         setError(null);
         try {
+          // The edited set always travels: the editor shows every attachment and
+          // the host rebuilds the message from exactly this list.
+          const attachments = await attachmentPayloads();
           const result = await mutate({
             action: 'edit',
             sessionId: sessionId,
             eventSeq: data.seq,
             blockIndex: blockIndex,
             text: draft,
+            attachments: attachments,
             stopPrevious: prefs.stopOnEdit,
           });
           const currentTree = treeStore.get(sessionId);
@@ -1135,6 +1606,7 @@ return {
             treeStore.setTree(result.sessionId, currentTree.versions.concat([newV]));
           }
           treeStore.load(result.sessionId);
+          releaseDrafts();
           setEditing(false);
           if (sessions) openWhenListed(sessions, result.sessionId);
         } catch (e) {
@@ -1189,7 +1661,7 @@ return {
         const cancelButton = function (key) {
           return React.createElement('button', {
             key: key, type: 'button', className: 'mtx-btn', disabled: busy,
-            onClick: function () { setEditing(false); },
+            onClick: function () { releaseDrafts(); setEditing(false); },
           }, t('cancel'));
         };
         const confirmButton = function (key, label) {
@@ -1199,21 +1671,95 @@ return {
             onClick: submit,
           }, label);
         };
+        const attachButton = function (key) {
+          return React.createElement('button', {
+            key: key, type: 'button', className: 'mtx-act', 'data-act': 'attach',
+            title: t('attach'), disabled: busy,
+            onClick: function () { if (fileInput.current) fileInput.current.click(); },
+          }, PaperclipIcon());
+        };
+        const picker = React.createElement('input', {
+          type: 'file', multiple: true, className: 'mtx-file-input', ref: fileInput,
+          onChange: function (e) {
+            addFiles(e.target.files);
+            e.target.value = '';
+          },
+        });
+        // The editor's own attachment area. The host's draft rail cannot be
+        // reused here: `conversation.input.attachments` is declared by the
+        // composer's entry, and a child slot may have exactly one declaring
+        // entry, so these chips carry the same state instead.
+        const removeChipButton = function (item) {
+          return React.createElement('button', {
+            type: 'button', className: 'mtx-remove', 'data-remove': item.id,
+            title: t('removeAttachment'), 'aria-label': t('removeAttachment'),
+            onClick: function () { removeAttachment(item.id); },
+          }, CloseIcon());
+        };
+        const chip = function (item) {
+          const upload = uploads[item.id];
+          if (item.kind === 'image') {
+            return React.createElement('span', { className: 'mtx-thumb', key: item.id, 'data-draft': item.id },
+              item.previewUrl === undefined
+                ? React.createElement('span', { className: 'mtx-thumb-empty' }, item.file.name || t('imagePending'))
+                : React.createElement('img', { src: item.previewUrl, alt: item.file.name }),
+              removeChipButton(item)
+            );
+          }
+          const status = upload === undefined ? 'ready' : upload.status;
+          const percent = upload !== undefined && upload.status === 'uploading' && upload.total > 0
+            ? Math.round((upload.loaded / upload.total) * 100)
+            : 0;
+          return React.createElement('span', {
+            className: 'mtx-file', key: item.id, 'data-draft': item.id, 'data-upload': status, title: item.file.name,
+          },
+            hostAtoms === null ? null : React.createElement(hostAtoms.FileTypeIcon, { path: item.file.name, className: 'mtx-file-icon' }),
+            React.createElement('span', { className: 'mtx-file-body' },
+              React.createElement('span', { className: 'mtx-file-name' }, item.file.name),
+              status === 'error'
+                ? React.createElement('button', {
+                  type: 'button', className: 'mtx-file-meta mtx-retry', 'data-retry': item.id,
+                  onClick: function () { retryFile(item.id); },
+                }, t('uploadFailed'))
+                : React.createElement('span', { className: 'mtx-file-meta' },
+                  status === 'uploading' ? t('uploading', { percent: percent }) : fileMetaText(item.file))
+            ),
+            removeChipButton(item)
+          );
+        };
+        const attachmentArea = editAttachments.length > 0
+          ? React.createElement('div', { className: 'mtx-attach', 'data-edit-attachments': '' }, editAttachments.map(chip))
+          : null;
         return React.createElement('div', { className: 'mtx-row' },
-          React.createElement('div', { className: 'mtx-editor' },
+          React.createElement('div', {
+            className: 'mtx-editor',
+            onDragOver: function (e) {
+              if (!carriesFiles(e)) return;
+              e.preventDefault();
+              e.stopPropagation();
+            },
+            onDrop: function (e) {
+              if (!carriesFiles(e)) return;
+              e.preventDefault();
+              e.stopPropagation();
+              addFiles(e.dataTransfer.files);
+            },
+          },
+            attachmentArea,
             React.createElement('textarea', {
               className: 'mtx-textarea',
               value: draft,
               autoFocus: true,
               onChange: function (e) { setDraft(e.target.value); },
               onKeyDown: function (e) {
-                if (e.key === 'Escape') setEditing(false);
+                if (e.key === 'Escape') { releaseDrafts(); setEditing(false); }
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit();
               },
             }),
-            images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null,
             error ? React.createElement('div', { className: 'mtx-error' }, error) : null,
             React.createElement('div', { className: 'mtx-editor-actions' },
+              attachButton('a-in'),
+              picker,
               cancelButton('c-in'), confirmButton('s-in', t('send'))
             )
           ),
@@ -1224,15 +1770,39 @@ return {
       }
 
       return React.createElement('div', { className: 'mtx-row', 'data-turn': turn, 'data-session': sessionId },
+        attachments.length > 0
+          ? React.createElement('div', { className: 'mtx-attachments', 'data-message-attachments': '' },
+            attachments.map(function (part, index) {
+              // Each list entry needs its own key: the gallery element the host
+              // hands back carries none.
+              return React.createElement(React.Fragment, { key: part.kind + ':' + index },
+                part.kind === 'file'
+                  ? fileCard(part.attachment, openAttachment, t('openFile', { name: part.attachment.name ?? '' }))
+                  // The host renders images through its images slot (native
+                  // gallery plus lightbox); keep the placeholder only when the
+                  // slot owner props do not carry the callback.
+                  : (typeof props.renderMessageImages === 'function'
+                    ? props.renderMessageImages({ images: part.images, align: 'end' })
+                    : React.createElement('div', { className: 'mtx-img' },
+                      t('images', { count: part.images.length })))
+              );
+            })
+          )
+          : null,
         React.createElement('div', { className: 'mtx-line' },
           React.createElement('div', { className: 'mtx-bubble' },
             text,
-            // The host renders attachments through its images slot (native
-            // gallery plus lightbox); keep the placeholder only when the slot
-            // owner props do not carry the callback.
-            messageImages.length > 0 && typeof props.renderMessageImages === 'function'
-              ? props.renderMessageImages({ images: messageImages, align: 'end' })
-              : (images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null)
+            // An image block without an attachment has nothing to delegate.
+            parts.bareImages > 0
+              ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: parts.bareImages }))
+              : null,
+            // Anything else the host would show as a JSON inspector, so an
+            // unknown block type is never silently swallowed.
+            parts.others.map(function (block, index) {
+              return unknownBlock(block, 'other:' + index, t('extraBlock'), function (total) {
+                return t('extraTruncated', { total: total });
+              });
+            })
           )
         ),
         // The controls sit under the bubble in all three references. Which
@@ -1252,7 +1822,8 @@ return {
             title: copied ? t('copied') : t('copy'), onClick: copy,
           }, CopyIcon())
         ),
-        error ? React.createElement('div', { className: 'mtx-error' }, error) : null
+        error ? React.createElement('div', { className: 'mtx-error' }, error) : null,
+        openError ? React.createElement('div', { className: 'mtx-error' }, openError) : null
       );
     }
 
@@ -1638,15 +2209,27 @@ return {
     // Shadow only the plain user bubble; steering and context rows keep the
     // host renderer. A collision with another user-bubble plugin degrades to
     // "they win" rather than failing this plugin's other registrations.
+    //
+    // `conversation.input.attachments` belongs to the composer's own entry: a
+    // child slot may be declared by exactly one entry, and the composer declared
+    // it first. Asking for it here throws, so the bubble is registered a second
+    // time without the rail instead of losing the whole view.
     slots.inject('conversation.chat.node', function () {
       try {
         return slots.register(
-          { name: 'conversation.chat.node', key: 'user', priority: -1 },
+          {
+            name: 'conversation.chat.node', key: 'user', priority: -1,
+            children: { 'conversation.input.attachments': { kind: 'single', scope: 'session-maybe' } },
+          },
           UserMessageView
         );
       } catch (e) {
-        console.warn('[dsh-plugin-message-edit] Failed to register the user-message view; editing is unavailable.', e);
-        return function () {};
+        try {
+          return slots.register({ name: 'conversation.chat.node', key: 'user', priority: -1 }, UserMessageView);
+        } catch (fallback) {
+          console.warn('[dsh-plugin-message-edit] Failed to register the user-message view; editing is unavailable.', fallback);
+          return function () {};
+        }
       }
     });
 
