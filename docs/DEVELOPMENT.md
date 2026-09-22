@@ -57,13 +57,24 @@ fresh checkout before running tests (Node 22.19+ or Node 24).
 - `test/client-images.test.mjs`: loads the generated client through its module
   loader, mounts its registered user-message component using React and jsdom,
   and checks image delegation, multiple/image-only messages, old-host fallback,
-  text-only messages, and entering/cancelling an edit. Host services and the image
-  gallery are test doubles; these are not full DSH integration tests.
+  file cards, mixed attachment order, the no-host-atoms fallback, unknown block
+  types, text-only messages, entering/cancelling an edit, the editable
+  attachment area (per-chip removal, background upload with a retry path, drop
+  and file-picker additions, staged-receipt and encoded-image submit payloads,
+  and the no-loader placeholder), and opening a file card in the sidebar
+  (the resolved-path request, the `dsh-resource://file/…` address grammar, and
+  the two failure messages). Host services, the image gallery and the host
+  atoms (loaded through `@deepseek-ai/dsh-client-ui-primitives`) are test
+  doubles; these are not full DSH integration tests. React key warnings fail a
+  test, so every rendered list must stay keyed.
 - `test/client-registration.test.mjs`: checks module dependencies and visible
   failures when services or registrations are unavailable.
 - `test/session-record.test.mjs` and `test/host-compatibility.test.mjs`: cover
-  legacy/current session shapes, live/resumed edit requests, retained images,
-  retry ancestry, nested version markers, and cache invalidation.
+  legacy/current session shapes, live/resumed edit requests, retained
+  attachments, edited attachment sets (kept references, staged receipts, encoded
+  images, refusals), attachment-path resolution (a stored reference, an unknown
+  one, a malformed digest, a traversal-shaped name, and the method gate), retry
+  ancestry, nested version markers, and cache invalidation.
 
 GitHub Actions runs these checks for pull requests and branch pushes, on
 Linux (Node 22 and 24) and Windows (Node 22). It also runs:
@@ -82,11 +93,17 @@ The workflow needs to be pushed to GitHub to run there. Making its checks
 mandatory before merging is a separate repository ruleset/branch-protection
 setting; adding the workflow alone does not block the Merge button.
 
-Before accepting an image-rendering change, also check it in a running DSH:
-send text with one/multiple images and an image-only message, open an image in
-the native viewer, enter/cancel an edit, then verify the original attachments
-survive an edit submission. CI's gallery double cannot verify native image
-loading, lightbox behavior, or compatibility with DSH's module injection.
+Before accepting an attachment-rendering change, also check it in a running DSH:
+send text with one/multiple images, an image-only message, a file attachment and
+a mixed image + file message; open an image in the native viewer; click a file
+card and confirm the right sidebar opens the document preview on that file (and
+that a PDF and a JSON both render); enter an edit and remove an attachment, add a
+file and an image (paperclip and drop), let an upload fail and retry it, then
+submit and confirm the branch carries exactly the edited set; cancel an edit and
+confirm the original attachments return. CI's gallery and file-card doubles
+cannot verify native image loading, the real file type icons, lightbox behavior,
+upload progress, the sidebar viewer, or compatibility with DSH's module
+injection.
 
 To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit/test/tree.test.mjs).
 

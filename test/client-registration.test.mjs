@@ -77,3 +77,48 @@ test('a user-renderer collision is reported while the other UI entries still reg
   assert.equal(warnings.length, 1);
   assert.match(warnings[0][0], /editing is unavailable/);
 });
+
+// The host's slots registry lets exactly one entry declare a child slot. The
+// composer's entry already declares `conversation.input.attachments`, so asking
+// for it throws — and losing the user view over that would take the edit button,
+// the version ring and the attachment cards with it.
+test('a child slot another entry already declared does not cost the user view', () => {
+  const { plugin, warnings } = load();
+  const registered = [];
+  plugin.apply({
+    get: name => name === 'slots' ? {
+      inject: (_name, register) => register(),
+      register(spec) {
+        if (spec.children) throw new Error('slot "conversation.input.attachments" is already declared');
+        registered.push(spec);
+        return () => {};
+      },
+    } : name === 'sessions' ? { open() {} } : undefined,
+    effect: fn => fn(),
+  });
+  assert.deepEqual(registered.map(spec => spec.name),
+    ['settings.section', 'conversation.chat.node', 'conversation.view']);
+  const user = registered.find(spec => spec.name === 'conversation.chat.node');
+  assert.equal(user.key, 'user');
+  assert.equal(user.priority, -1, 'The bubble still shadows the host renderer');
+  assert.equal(Object.hasOwn(user, 'children'), false, 'The retry declares no children');
+  assert.deepEqual(warnings, [], 'Recovering from the collision is not a visible failure');
+});
+
+test('the user view asks for the attachment slot when nothing declared it yet', () => {
+  const { plugin } = load();
+  const registered = [];
+  plugin.apply({
+    get: name => name === 'slots' ? {
+      inject: (_name, register) => register(),
+      register(spec) { registered.push(spec); return () => {}; },
+    } : name === 'sessions' ? { open() {} } : undefined,
+    effect: fn => fn(),
+  });
+  const user = registered.find(spec => spec.name === 'conversation.chat.node');
+  // The declaration object is built inside the bundle's realm, so compare its
+  // fields rather than the object identity.
+  assert.deepEqual(Object.keys(user.children), ['conversation.input.attachments']);
+  assert.equal(user.children['conversation.input.attachments'].kind, 'single');
+  assert.equal(user.children['conversation.input.attachments'].scope, 'session-maybe');
+});
