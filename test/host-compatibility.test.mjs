@@ -209,3 +209,45 @@ test('invalid edit targets are rejected without creating a branch', async () => 
   assert.equal(result.status, 409);
   assert.equal(h.creations.length, 0);
 });
+
+test('activate unarchives through workspaceRegistry.unarchiveSession', async () => {
+  let route;
+  const calls = [];
+  const registry = {
+    archivedSessionIds: ['source'],
+    async unarchiveSession(id) {
+      calls.push(id);
+      this.archivedSessionIds = this.archivedSessionIds.filter((existing) => existing !== id);
+    },
+    enqueueOperation() { throw new Error('private archive write must not run when unarchiveSession exists'); },
+  };
+  apply({
+    get(name) { return this[name]; },
+    effect(fn) { fn(); },
+    webServer: { register(spec) { route = spec.handler; return () => {}; } },
+    workspaceRegistry: registry,
+  });
+  const req = Readable.from([JSON.stringify({ action: 'activate', sessionId: 'source' })]);
+  req.method = 'POST';
+  req.url = '/message-tree';
+  let status;
+  let payload;
+  await route(req, {
+    writeHead(code) { status = code; },
+    end(json) { payload = json === undefined ? undefined : JSON.parse(json); },
+  });
+  assert.equal(status, 200, JSON.stringify(payload));
+  assert.deepEqual(payload, { unarchived: true });
+  assert.deepEqual(calls, ['source']);
+
+  const again = Readable.from([JSON.stringify({ action: 'activate', sessionId: 'source' })]);
+  again.method = 'POST';
+  again.url = '/message-tree';
+  let second;
+  await route(again, {
+    writeHead() {},
+    end(json) { second = JSON.parse(json); },
+  });
+  assert.deepEqual(second, { unarchived: false });
+  assert.deepEqual(calls, ['source']);
+});

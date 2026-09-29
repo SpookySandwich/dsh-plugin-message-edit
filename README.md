@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
 [![CI](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-0.1.5--rc.2-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![dsh](https://img.shields.io/badge/dsh-0.2.0--rc.2-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 编辑一条已经发出的消息，对话会从那一刻 **真正回溯并分叉**——和 ChatGPT、Claude、DeepSeek 的做法一致。旧版本不会被覆盖：气泡下方出现 `‹ 2/4 ›` 计数，「版本」标签页则画出整棵树。
@@ -72,15 +72,17 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
+版本 `1.2.0`：在官方 dsh `0.2.0-rc.2` 上通过 `workspaceRegistry.unarchiveSession` 取消版本归档。
+
 版本 `1.1.0`：修复编辑/重试的 seed 边界，发布分支前清空继承的待发送输入，按会话身份识别版本标记，保留推理强度，并通过会话观察接口恢复持久分支。
 
-声明兼容范围为 `>=0.1.5-rc.2 <0.1.6-0`；已验证官方 `0.1.5-rc.2`，不声明兼容 `0.1.6` alpha。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/dsh-0.1.5.md)。
+声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0`；官方 dsh `0.2.0-rc.2` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/dsh-0.1.5.md)。
 
-可从 [GitHub Release](https://github.com/SpookySandwich/dsh-plugin-message-edit/releases/tag/v1.1.0) 下载发布包，然后执行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.1.0.tgz`。
+可从 [GitHub Release](https://github.com/SpookySandwich/dsh-plugin-message-edit/releases/tag/v1.2.0) 下载发布包，然后执行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.2.0.tgz`。
 
 `1.1.0` 已在 DSH `0.1.5-rc.2` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
 
-兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。DSH 仍在快速迭代，尚未验证的后续版本不在此保证范围内。更新插件后请重启 DSH。
+兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。本版本对应官方 dsh `0.2.0-rc.2`。更新插件后请重启 DSH。
 
 可与 [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream)、[dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout) 共存。
 

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-assert.ok(process.env.DSH_QA_MODULES, 'Set DSH_QA_MODULES to an official @deepseek-ai/dsh@0.1.5-rc.2 node_modules directory');
+assert.ok(process.env.DSH_QA_MODULES, 'Set DSH_QA_MODULES to an official @deepseek-ai/dsh@0.2.0-rc.2 node_modules directory');
 const modules = resolve(process.env.DSH_QA_MODULES);
 const home = await mkdtemp(join(tmpdir(), 'message-edit-dsh-qa-'));
 const profile = join(home, 'profiles', 'web');
