@@ -40,7 +40,7 @@ jobs:
         run: git diff --exit-code
 
   official-host:
-    name: DSH 0.1.5-rc.2 / ${{ matrix.os }}
+    name: DSH 0.2.0-rc.2 / ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
@@ -56,7 +56,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Install published official runtime
-        run: npm install --prefix "${{ runner.temp }}/dsh-runtime" --no-audit --no-fund @deepseek-ai/dsh@0.1.5-rc.2
+        run: npm install --prefix "${{ runner.temp }}/dsh-runtime" --no-audit --no-fund @deepseek-ai/dsh@0.2.0-rc.2
       - name: Verify real edits and restart persistence with an offline model
         run: node scripts/run-dsh-acceptance.mjs
         env:
