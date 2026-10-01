@@ -28,7 +28,9 @@ test('declared client dependencies make the UI services available for registrati
   };
   plugin.apply({
     get: name => name === 'slots' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-renderer') ? slots
-      : name === 'sessions' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-api-session-controller') ? { open() {} } : undefined,
+      : name === 'sessions' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-api-session-controller') ? { list: {} }
+      : name === 'uiWorkspace' && pkg.dsh.client.inject.includes('@deepseek-ai/dsh-client-ui-workspace') ? { openSession() {} }
+      : undefined,
     effect: fn => fn(),
   });
   assert.deepEqual(registered, ['settings.section', 'conversation.chat.node', 'conversation.view']);
@@ -39,7 +41,17 @@ test('a missing slots service fails visibly instead of silently disabling the mo
   assert.throws(() => plugin.apply({ get: () => undefined }), /Missing DSH slots service.*inject/);
 });
 
-test('Cordis waits for the asynchronous session service before applying the client', async t => {
+test('a missing workspace navigation owner fails visibly', () => {
+  const { plugin } = load();
+  const slots = { inject() {} };
+  const sessions = { list: {} }; // DSH 0.2 sessions intentionally has no open() method.
+  assert.throws(() => plugin.apply({
+    get: name => name === 'slots' ? slots : name === 'sessions' ? sessions : undefined,
+    effect: fn => fn(),
+  }), /Missing DSH sessions or uiWorkspace navigation service/);
+});
+
+test('Cordis waits for both session data and workspace navigation before applying the client', async t => {
   const { plugin } = load();
   const ctx = new Context();
   t.after(() => ctx.fiber.dispose());
@@ -53,7 +65,11 @@ test('Cordis waits for the asynchronous session service before applying the clie
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(fiber.state, 0, 'Client remains pending until the session controller is ready');
   assert.deepEqual(registered, []);
-  ctx.provide('sessions', { open() {} });
+  ctx.provide('sessions', { list: {} });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fiber.state, 0, 'Client also waits for the workspace navigation owner');
+  assert.deepEqual(registered, []);
+  ctx.provide('uiWorkspace', { openSession() {} });
   await fiber;
   assert.equal(fiber.state, 2);
   assert.deepEqual(registered, ['settings.section', 'conversation.chat.node', 'conversation.view']);
@@ -70,7 +86,9 @@ test('a user-renderer collision is reported while the other UI entries still reg
         registered.push(spec.name);
         return () => {};
       },
-    } : name === 'sessions' ? { open() {} } : undefined,
+    } : name === 'sessions' ? { list: {} }
+      : name === 'uiWorkspace' ? { openSession() {} }
+      : undefined,
     effect: fn => fn(),
   });
   assert.deepEqual(registered, ['settings.section', 'conversation.view']);

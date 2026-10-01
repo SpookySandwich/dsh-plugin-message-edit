@@ -408,25 +408,26 @@ function ringFor(versions, sessionId, turn) {
  * target is activated through the host route before opening. Ghosts (deleted
  * versions) are never openable.
  */
-async function openVersionTarget(sessions, v) {
-  if (!v || v.deleted || !sessions) return;
+async function openVersionTarget(navigation, v) {
+  if (!v || v.deleted || !navigation) return;
   if (v.archived) {
     try {
       await mutate({ action: 'activate', sessionId: v.sessionId });
       treeStore.invalidate();
     } catch (e) {}
   }
-  openWhenListed(sessions, v.sessionId);
+  openWhenListed(navigation, v.sessionId);
 }
 
-function openWhenListed(sessions, sessionId) {
-  const list = sessions.list;
-  if (!list || typeof list.getSnapshot !== 'function') { sessions.open(sessionId); return; }
-  if (list.getSnapshot().byId[sessionId] !== undefined) { sessions.open(sessionId); return; }
+function openWhenListed(navigation, sessionId) {
+  const list = navigation.list;
+  const open = navigation.openVersion;
+  if (!list || typeof list.getSnapshot !== 'function') { open(sessionId); return; }
+  if (list.getSnapshot().byId[sessionId] !== undefined) { open(sessionId); return; }
   const stop = list.subscribe(function () {
     if (list.getSnapshot().byId[sessionId] !== undefined) {
       stop();
-      sessions.open(sessionId);
+      open(sessionId);
     }
   });
 }
@@ -853,7 +854,7 @@ const CSS = [
 return {
   // Module dependencies load code; Cordis injection waits for its services.
   // The session controller becomes ready asynchronously after connection.
-  inject: ['slots', 'sessions', 'locale'],
+  inject: ['slots', 'sessions', 'locale', 'uiWorkspace'],
   apply(ctx) {
     const slots = ctx.get('slots');
     if (slots === undefined) {
@@ -864,9 +865,12 @@ return {
     ctx.effect(function () { syncStyleAttribute(); return styleStore.subscribe(syncStyleAttribute); });
 
     const sessions = ctx.get('sessions');
-    if (!sessions || typeof sessions.open !== 'function') {
-      throw new Error('[dsh-plugin-message-edit] Missing DSH session navigation service. Check client dependencies and restart DSH.');
+    const uiWorkspace = ctx.get('uiWorkspace');
+    if (!sessions || !sessions.list || !uiWorkspace || typeof uiWorkspace.openSession !== 'function') {
+      throw new Error('[dsh-plugin-message-edit] Missing DSH sessions or uiWorkspace navigation service. Check client dependencies and restart DSH.');
     }
+    // DSH 0.2 keeps catalog data in sessions and navigation in uiWorkspace.
+    const navigation = { list: sessions.list, openVersion: id => uiWorkspace.openSession(id) };
 
     ctx.effect(function () {
       if (sessions && sessions.list && typeof sessions.list.subscribe === 'function') {
@@ -1015,7 +1019,7 @@ return {
       if (!ring) return null;
       const go = function (delta) {
         const next = ring.alternatives[ring.index + delta];
-        if (next) openVersionTarget(sessions, next);
+        if (next) openVersionTarget(navigation, next);
       };
       return React.createElement('div', { className: 'mtx-ring' },
         React.createElement('button', {
@@ -1082,8 +1086,8 @@ return {
         if (!target || target.deleted) return;
         restoredFamilies.add(root);
         pendingRestore.add(root);
-        openVersionTarget(sessions, target);
-      }, [versions, sessionId, sessions, prefs.rememberPath]);
+        openVersionTarget(navigation, target);
+      }, [versions, sessionId, navigation, prefs.rememberPath]);
 
       const [editing, setEditing] = React.useState(false);
       const [draft, setDraft] = React.useState('');
@@ -1136,7 +1140,7 @@ return {
           }
           treeStore.load(result.sessionId);
           setEditing(false);
-          if (sessions) openWhenListed(sessions, result.sessionId);
+          openWhenListed(navigation, result.sessionId);
         } catch (e) {
           setError(String(e && e.message || e));
         }
@@ -1167,7 +1171,7 @@ return {
             treeStore.setTree(result.sessionId, currentTree.versions.concat([newV]));
           }
           treeStore.load(result.sessionId);
-          if (sessions) openWhenListed(sessions, result.sessionId);
+          openWhenListed(navigation, result.sessionId);
         } catch (e) {
           setError(String(e && e.message || e));
         }
@@ -1417,7 +1421,7 @@ return {
         if (!node || node.deleted || !sessions) return;
         const v = versions.find(function (item) { return item.sessionId === node.sessionId; });
         if (!v) return;
-        openVersionTarget(sessions, v);
+        openVersionTarget(navigation, v);
         showChat();
         if (typeof node.turn === 'number' && node.turn > 0) flashTurn(node.sessionId, node.turn, 45);
       }

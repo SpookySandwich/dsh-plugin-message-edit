@@ -65,10 +65,9 @@ async function mount(t, content, renderMessageImages, options = {}) {
   }, { filename: 'lib/client.js' });
   plugin.apply({
     get(name) { return name === 'slots' ? slots : name === 'sessions' ? {
-      open: options.open ?? (() => {}),
       list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: Object.fromEntries(
         ['session-test', ...(options.versions ?? []).map(version => version.sessionId)].map(id => [id, { id }])) }) },
-    } : undefined; },
+    } : name === 'uiWorkspace' ? { openSession: options.open ?? (() => {}) } : undefined; },
     effect(fn) { const dispose = fn(); if (typeof dispose === 'function') disposers.push(dispose); },
   });
   assert.equal(typeof component, 'function', 'The user-message slot must register');
