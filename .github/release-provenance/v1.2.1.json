@@ -1,0 +1,9 @@
+{
+  "package": "dsh-plugin-message-edit",
+  "version": "1.2.1",
+  "sourceCommit": "c55c67b4334ea1fa5501d79c7660c05d7e49fbdc",
+  "integrity": "sha512-Y2PcEh0OQNADr90v8S3bl062YdQisDdk9eu98blzvOnDzFHValCXJmcpVggBC4SNPNWYmCxFsRFM6BjewWc/zw==",
+  "reason": "npm-10.9.3-linked-worktree-gitHead-omission",
+  "reproducedFromNormalClone": true,
+  "verification": "A fresh normal clone at sourceCommit ran npm pack, including its build lifecycle; its archive exactly matched the downloaded npm artifact and this SHA-512 integrity. Verified 2026-10-05."
+}

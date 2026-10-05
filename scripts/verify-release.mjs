@@ -2,8 +2,9 @@
 // Read-only: this command never publishes, tags, edits or uploads anything.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { releaseSource, verifyArchive } from './release-integrity.mjs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const version = process.argv[2] ?? pkg.version;
@@ -28,24 +29,36 @@ const [metadata, reference, release] = await Promise.all([
   read('GitHub tag', () => github(`git/ref/tags/${tag}`)),
   read('GitHub release', () => github(`releases/tags/${tag}`)),
 ]);
+let source;
 if (metadata && reference) await read('Source commit', () => {
-  assert.ok(metadata.gitHead, 'npm metadata has no source commit');
+  let provenance;
+  if (!metadata.gitHead && version === '1.2.1') {
+    provenance = JSON.parse(execFileSync('git', ['show', 'HEAD:.github/release-provenance/v1.2.1.json'], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)), encoding: 'utf8', windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }));
+  }
+  source = releaseSource(metadata, pkg, version, provenance);
   const commit = github(`commits/${tag}`);
-  assert.equal(commit.sha, metadata.gitHead, 'GitHub tag and npm gitHead differ');
+  assert.equal(commit.sha, source.commit, 'GitHub tag and verified source commit differ');
 });
-if (release && metadata) await read('Release archive', async () => {
+if (metadata && source) await read('npm archive', async () => {
+  const response = await fetch(metadata.dist.tarball);
+  assert.ok(response.ok, `npm archive download: HTTP ${response.status}`);
+  verifyArchive(Buffer.from(await response.arrayBuffer()), source.integrity, 'npm archive');
+});
+if (release && source) await read('Release archive', async () => {
   assert.equal(release.draft, false, 'GitHub release is still a draft');
+  assert.equal(release.tag_name, tag, 'GitHub release tag differs');
   const filename = `${pkg.name.replace(/^@/, '').replace('/', '-')}-${version}.tgz`;
   const asset = release.assets.find(asset => asset.name === filename);
   assert.ok(asset, `GitHub release is missing ${filename}`);
   const response = await fetch(asset.browser_download_url);
   assert.ok(response.ok, `Archive download: HTTP ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
-  const [algorithm, digest] = metadata.dist.integrity.split('-');
-  assert.ok(['sha512', 'sha256'].includes(algorithm), 'Unsupported npm integrity algorithm');
-  assert.equal(createHash(algorithm).update(bytes).digest('base64'), digest, 'GitHub archive differs from the published npm artifact');
+  verifyArchive(bytes, source.integrity, 'GitHub archive');
 });
 if (failures.length) {
   console.error(`Incomplete release: ${pkg.name}@${version}\n${failures.map(failure => `- ${failure}`).join('\n')}`);
   process.exitCode = 1;
-} else console.log(`Verified ${pkg.name}@${version}: npm source, GitHub tag, public release and identical archive.`);
+} else console.log(`Verified ${pkg.name}@${version}: ${source.evidence}, GitHub tag, public release and identical npm/GitHub archives.`);

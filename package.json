@@ -40,8 +40,10 @@
     "pretest": "npm run build",
     "test": "node scripts/build-client.mjs --check && node --test test/*.test.mjs",
     "prepack": "npm run build",
+    "prepublishOnly": "node scripts/check-publish-source.mjs",
     "check:package": "node scripts/check-package.mjs",
-    "check:release": "node scripts/verify-release.mjs"
+    "check:release": "node scripts/verify-release.mjs",
+    "check:release-tools": "node --test scripts/release-tools.test.mjs"
   },
   "dsh": {
     "bundle": {
