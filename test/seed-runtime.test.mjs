@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { Session, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session';
 import { apply } from '../lib/index.js';
 
-test('real DSH 0.1.5 constructor accepts a branch and setup clears rewound input before publication', async () => {
+test('real DSH 0.2.0-rc.2 constructor accepts a branch and setup clears rewound input before publication', async () => {
   const header = { version: SESSION_FORMAT_VERSION, id: 'source', createdAt: 1,
     cwd: process.cwd(), isSeeded: false, delegationDepth: 0 };
   const source = Session.create('source', undefined, header);

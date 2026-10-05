@@ -134,14 +134,18 @@ CI runs this on Linux and Windows in addition to the regression suite.
 npm run build
 npm pack
 ```
-This produces a tarball: `dsh-plugin-message-edit-0.1.0.tgz`.
+This produces a tarball: `dsh-plugin-message-edit-1.2.1.tgz`.
 
 ### Step 2: Install into DSH Profile
 To install into the DSH Desktop profile:
 ```bash
-dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-0.1.0.tgz
+dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.2.1.tgz
 ```
 Or sync files directly into `~/.dsh/profiles/desktop/node_modules/dsh-plugin-message-edit/`.
 
 ### Step 3: Restart DSH Desktop
 Restart DSH Desktop to reload the host-side plugin in the server process and mount the updated client interface.
+
+Before announcing a release, follow [the release procedure](../.github/RELEASING.md)
+and run `npm run check:release -- VERSION`. Publishing to npm alone does not
+create the GitHub tag or downloadable release archive.

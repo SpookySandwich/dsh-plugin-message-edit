@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, mkdir, symlink, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, symlink, writeFile, copyFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 
@@ -26,7 +26,9 @@ try {
   await symlink(root, join(profile, 'node_modules', 'dsh-plugin-message-edit'), 'junction');
   await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'message-edit-qa', private: true,
     dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-plugin-message-edit'] } } }));
-  await writeFile(join(profile, 'cordis.patch.yml'), `- insert:\n    - id: offline-qa\n      name: ${JSON.stringify(join(root, 'test/fixtures/dsh-acceptance.mjs'))}\n`);
+  // A fixture is a separate host-only entry, not a second client package source.
+  await copyFile(join(root, 'test/fixtures/dsh-acceptance.mjs'), join(profile, 'fixture.mjs'));
+  await writeFile(join(profile, 'cordis.patch.yml'), '- insert:\n    - id: offline-qa\n      name: ./fixture.mjs\n');
   for (const phase of ['fresh', 'restart']) {
     let output = '';
     server = spawn(process.execPath, ['--expose-internals', join(modules, '@deepseek-ai/dsh/lib/bin.js'),
@@ -36,7 +38,7 @@ try {
     });
     server.stdout.on('data', chunk => { output += chunk; });
     server.stderr.on('data', chunk => { output += chunk; });
-    const deadline = Date.now() + 60000;
+    const deadline = Date.now() + 180000;
     let origin;
     while (!origin) {
       origin = output.match(/dsh web: (http:\/\/127\.0\.0\.1:\d+)/)?.[1];

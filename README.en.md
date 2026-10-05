@@ -72,13 +72,15 @@ For technical details and developer guides, see:
 
 ## Compatibility
 
+Version `1.2.1` (current source): Fix DSH 0.2 client activation and route edits, retries, and version switching through `uiWorkspace.openSession`.
+
 Version `1.2.0`: Unarchive a version through `workspaceRegistry.unarchiveSession` on official dsh `0.2.0-rc.2`.
 
 Version `1.1.0`: Fix seeded edit/retry creation, clear inherited pending input before publication, identify version markers by session ownership, preserve reasoning effort, and read persisted branches through disposable session observations.
 
 The declared host range is `>=0.2.0-rc.2 <0.3.0-0`; official dsh `0.2.0-rc.2` satisfies it. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/dsh-0.1.5.md).
 
-Download the archive from the [GitHub Release](https://github.com/SpookySandwich/dsh-plugin-message-edit/releases/tag/v1.2.0), then run `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.2.0.tgz`.
+Install published versions from [npm](https://www.npmjs.com/package/dsh-plugin-message-edit). To test the current source, run `npm ci` and `npm pack`, then `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.2.1.tgz`. See the [release procedure](.github/RELEASING.md) for publication checks.
 
 Version `1.1.0` has been verified in an isolated DSH `0.1.5-rc.2` Web environment:
 plugin loading, images, edit/retry, nested branches, and restored sessions. Model

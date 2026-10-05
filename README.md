@@ -72,13 +72,15 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
+版本 `1.2.1`（当前源码）：修复 DSH 0.2 客户端加载，编辑、重试及版本切换改用 `uiWorkspace.openSession` 导航。
+
 版本 `1.2.0`：在官方 dsh `0.2.0-rc.2` 上通过 `workspaceRegistry.unarchiveSession` 取消版本归档。
 
 版本 `1.1.0`：修复编辑/重试的 seed 边界，发布分支前清空继承的待发送输入，按会话身份识别版本标记，保留推理强度，并通过会话观察接口恢复持久分支。
 
 声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0`；官方 dsh `0.2.0-rc.2` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/dsh-0.1.5.md)。
 
-可从 [GitHub Release](https://github.com/SpookySandwich/dsh-plugin-message-edit/releases/tag/v1.2.0) 下载发布包，然后执行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.2.0.tgz`。
+已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.2.1.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
 
 `1.1.0` 已在 DSH `0.1.5-rc.2` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
 
