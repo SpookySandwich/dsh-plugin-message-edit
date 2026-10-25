@@ -38,4 +38,4 @@ An uncommitted record cannot enable the exception. Other missing source
 commits fail verification. Published 1.2.0 has npm `gitHead` and uses the normal
 verification path.
 
-For DSH 0.1.5-rc.2, retain plugin 1.1.0. Current source targets DSH 0.2.0-rc.2.
+For DSH 0.1.5-rc.2, retain plugin 1.1.0. Current source targets DSH 0.2.1-rc.2 (compatible with 0.2.0-rc.2).

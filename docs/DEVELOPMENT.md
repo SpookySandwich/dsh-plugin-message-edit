@@ -93,7 +93,7 @@ To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit
 ### Optional real DSH acceptance
 
 `test/fixtures/dsh-acceptance.mjs` is an offline model adapter and live/cold
-session fixture for an installed official DSH `0.2.0-rc.2` runtime. Mount it
+session fixture for an installed official DSH `0.2.0-rc.2` or `0.2.1-rc.2` runtime. Mount it
 only in a new temporary home whose name contains `message-edit-dsh-qa-`.
 Set `DSH_HOME` to that home and `DSH_QA_MODULES` to the official runtime's
 `node_modules` directory. Use a separate Web profile with the base/Web bundles,
@@ -134,12 +134,12 @@ CI runs this on Linux and Windows in addition to the regression suite.
 npm run build
 npm pack
 ```
-This produces a tarball: `dsh-plugin-message-edit-1.2.1.tgz`.
+This produces a tarball: `dsh-plugin-message-edit-1.3.0.tgz`.
 
 ### Step 2: Install into DSH Profile
 To install into the DSH Desktop profile:
 ```bash
-dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.2.1.tgz
+dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.3.0.tgz
 ```
 Or sync files directly into `~/.dsh/profiles/desktop/node_modules/dsh-plugin-message-edit/`.
 
