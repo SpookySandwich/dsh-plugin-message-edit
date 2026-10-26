@@ -45,7 +45,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - run: npm install --global npm@12.2.1 --registry=https://registry.npmjs.org
+      - run: npm install --global npm@11.21.1 --registry=https://registry.npmjs.org
       - run: node --test automation/scripts/npm-publish.test.mjs
       - id: resolve
         working-directory: automation

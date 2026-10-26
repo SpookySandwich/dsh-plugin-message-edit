@@ -43,7 +43,9 @@ lock a GitHub ref and an npm publication.
 The job runs npm ci, build, tests, existing release-tool/package checks and any
 existing prepublishOnly guard, plus its own clean-normal-clone guard. npm publishes
 the directory with lifecycle scripts enabled so gitHead is retained. Release
-builds use Node 24, npm 12.2.1, fresh GitHub-hosted runners and no dependency cache.
+builds use Node 24, npm 11.21.1, fresh GitHub-hosted runners and no dependency cache.
+The npm 11 pin preserves the pack --json output expected by historical package
+checks; npm 12 changes that output and requires a separate compatibility review.
 
 The executing workflow remains `.github/workflows/publish.yml`: on dispatch its
 workflow/OIDC identity refers to `refs/heads/master`, even while the checked-out

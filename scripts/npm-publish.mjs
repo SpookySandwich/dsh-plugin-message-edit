@@ -163,7 +163,7 @@ async function main(mode) {
   let state = await registryState(version, commit);
   if (mode === 'publish') {
     assert.equal(process.versions.node.split('.')[0], '24', 'Release runtime must be Node 24');
-    assert.equal(run('npm', ['--version']), '12.2.1', 'Use the reviewed npm version');
+    assert.equal(run('npm', ['--version']), '11.21.1', 'Use the reviewed npm version');
     const npm = args => run('npm', args, { stdio: 'inherit' });
     const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
     assert.equal(lock.version, version);
