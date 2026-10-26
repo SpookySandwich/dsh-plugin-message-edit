@@ -139,12 +139,12 @@ CI runs this on Linux and Windows in addition to the regression suite.
 npm run build
 npm pack
 ```
-This produces a tarball: `dsh-plugin-message-edit-1.4.0.tgz`.
+This produces a tarball: `dsh-plugin-message-edit-1.4.1.tgz`.
 
 ### Step 2: Install into DSH Profile
 To install into the DSH Desktop profile:
 ```bash
-dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.4.0.tgz
+dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.4.1.tgz
 ```
 Or sync files directly into `~/.dsh/profiles/desktop/node_modules/dsh-plugin-message-edit/`.
 

@@ -72,7 +72,9 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
-版本 `1.4.0`（当前源码）：新增俄语（`ru` / `Русский`）客户端本地化（完整覆盖全部 37 条界面与图片文案），并在宿主语言选择器中注册 `Русский`（宿主未翻译界面回退至英语；若未显式保存语言偏好且浏览器语言顺序将俄语排在中文之前，自动检测会选中俄语并将未翻译宿主界面回退为英语；预加载的 `ru` 语言包会被优先保留，若外部 `ru` 语言包在本插件之后加载则会因重复注册冲突）。
+版本 `1.4.1`（当前源码）：在仓库检出环境的 `overrides` 与锁文件中将 `@deepseek-ai/dsh-mcp-client` 的 `@modelcontextprotocol/client`（及 `@modelcontextprotocol/core`）固定为 `2.3.0`，覆盖 [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h)（`CVE-2026-104850`，`2.2.0` 修复）与 [GHSA-6prh-2h8m-c8cw](https://github.com/advisories/GHSA-6prh-2h8m-c8cw)（`CVE-2026-111769`，跨源重定向转发自定义请求头与 `307`/`308` 请求体，`2.3.0` 修复；`2.3.0` 在 Node 下仅跟随同源重定向，依赖跨源重定向的 MCP 服务端需配置最终 URL）。该变更仅加固本仓库开发/测试检出环境；npm 作为依赖安装时会忽略 `overrides` 且发布包不含 `package-lock.json`，安装或更新本插件不会修改用户现有 DSH 宿主依赖。
+
+版本 `1.4.0`：新增俄语（`ru` / `Русский`）客户端本地化（完整覆盖全部 37 条界面与图片文案），并在宿主语言选择器中注册 `Русский`（宿主未翻译界面回退至英语；若未显式保存语言偏好且浏览器语言顺序将俄语排在中文之前，自动检测会选中俄语并将未翻译宿主界面回退为英语；预加载的 `ru` 语言包会被优先保留，若外部 `ru` 语言包在本插件之后加载则会因重复注册冲突）。
 
 版本 `1.3.1`：当宿主不再传入旧版 `renderMessageImages` 回调时，通过宿主 `conversation.chat.user.content` 工厂恢复用户消息图片与原图预览，并提供基于 `loadImage` / `loadImage.peek` 的异步缩略图兜底。
 
@@ -86,7 +88,7 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2`；官方 dsh `0.2.0-rc.2` 与 `0.2.1-rc.2` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/dsh-0.1.5.md)。
 
-已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.4.0.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
+已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.4.1.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
 
 `1.1.0` 已在 DSH `0.1.5-rc.2` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
 
