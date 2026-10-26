@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { config, versionOf, eventTag, resolveTag, cleanSource, checkPackage, registryState, verifyBytes, ensureAsset } from './npm-publish.mjs';
+import { config, versionOf, eventTag, resolveTag, cleanSource, checkPackage, registryState, verifyBytes, ensureAsset, pollReady, waitPublication, verifyProvenance, certificatePolicy, publishDirectory } from './npm-publish.mjs';
 
 const commit = 'a'.repeat(40);
 const bytes = Buffer.from('registry archive, never rebuilt');
@@ -51,7 +51,7 @@ test('archive retry verifies bytes and never overwrites a collision', async () =
   verifyBytes(bytes, integrity);
   assert.throws(() => verifyBytes(Buffer.from('corrupt'), integrity));
   let uploads = 0;
-  const asset = { name: 'package.tgz' };
+  const asset = { name: 'package.tgz', state: 'uploaded', id: 10 };
   const adapter = { download: async () => bytes, upload: async data => { assert.deepEqual(data, bytes); uploads++; }, refresh: async () => ({ assets: [asset] }) };
   await ensureAsset({ assets: [] }, asset.name, bytes, integrity, adapter);
   assert.equal(uploads, 1);
@@ -60,6 +60,133 @@ test('archive retry verifies bytes and never overwrites a collision', async () =
   await assert.rejects(ensureAsset({ assets: [asset] }, asset.name, bytes, integrity, { ...adapter, download: async () => Buffer.from('collision') }), /integrity/);
   assert.equal(uploads, 1);
   await assert.rejects(ensureAsset({ assets: [asset, asset] }, asset.name, bytes, integrity, adapter), /Duplicate/);
+  await assert.rejects(ensureAsset({ assets: [{ ...asset, state: 'starter' }] }, asset.name, bytes, integrity, adapter), /unfinished.*No automatic overwrite/);
+  assert.equal(uploads, 1);
+});
+
+const repositoryURL = `https://github.com/SpookySandwich/${config.name}`;
+const workflowCommit = 'b'.repeat(40); // Deliberately different from release gitHead.
+const publishingRun = { id: 123, run_attempt: 1, repository: { full_name: `SpookySandwich/${config.name}` },
+  path: '.github/workflows/publish.yml', event: 'workflow_dispatch', head_branch: config.branch, head_sha: workflowCommit };
+const invocation = `${repositoryURL}/actions/runs/123/attempts/1`;
+const provenanceType = 'https://slsa.dev/provenance/v1';
+const published = { ...metadata, dist: { ...metadata.dist, attestations: {
+  url: `https://registry.npmjs.org/-/npm/v1/attestations/${config.name}@1.2.3`, provenance: { predicateType: provenanceType },
+} } };
+function statementFixture() {
+  const ref = `refs/heads/${config.branch}`;
+  return { _type: 'https://in-toto.io/Statement/v1', predicateType: provenanceType,
+    subject: [{ name: `pkg:npm/${config.name}@1.2.3`, digest: { sha512: createHash('sha512').update(bytes).digest('hex') } }],
+    predicate: { buildDefinition: {
+      buildType: 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1',
+      externalParameters: { workflow: { ref, repository: repositoryURL, path: '.github/workflows/publish.yml' } },
+      internalParameters: { github: { event_name: 'workflow_dispatch' } },
+      resolvedDependencies: [{ uri: `git+${repositoryURL}@${ref}`, digest: { gitCommit: workflowCommit } }],
+    }, runDetails: { builder: { id: 'https://github.com/actions/runner/github-hosted' }, metadata: { invocationId: invocation } } } };
+}
+const bundleDocument = statement => ({ attestations: [{ predicateType: provenanceType, bundle: {
+  dsseEnvelope: { payloadType: 'application/vnd.in-toto+json', payload: Buffer.from(JSON.stringify(statement)).toString('base64') },
+} }] });
+
+test('npm publication inherits the actual GitHub environment without source overrides', () => {
+  let calls = 0;
+  publishDirectory('backfill', (command, args, options) => {
+    calls++;
+    assert.equal(command, 'npm');
+    assert.deepEqual(args, ['publish', '--access=public', '--provenance', '--registry=https://registry.npmjs.org', '--tag=backfill']);
+    assert.deepEqual(options, { stdio: 'inherit' });
+    assert.equal(Object.hasOwn(options, 'env'), false);
+  });
+  assert.equal(calls, 1);
+});
+
+test('dispatch provenance follows original workflow context while release gitHead remains independent', async () => {
+  let verifications = 0;
+  const options = { getRun: async path => { assert.equal(path, 'actions/runs/123/attempts/1'); return publishingRun; },
+    verify: async (bundle, context) => {
+      verifications++;
+      assert.equal(context.sha, workflowCommit);
+      assert.notEqual(context.sha, metadata.gitHead);
+      const policy = certificatePolicy(context);
+      assert.equal(policy.certificateIssuer, 'https://token.actions.githubusercontent.com');
+      assert.ok(new RegExp(policy.certificateIdentityURI).test(context.workflow));
+      assert.ok(!new RegExp(policy.certificateIdentityURI).test(context.workflow.replace('github.com', 'githubXcom')));
+      assert.ok(policy.certificateOIDs['1.3.6.1.4.1.57264.1.13'].includes(Buffer.from(workflowCommit)));
+      assert.ok(!policy.certificateOIDs['1.3.6.1.4.1.57264.1.13'].includes(Buffer.from(commit)));
+    } };
+  assert.equal(await verifyProvenance(bundleDocument(statementFixture()), metadata, { ...options, expectedInvocation: invocation }), true);
+  // A repair from another workflow run accepts the original verified invocation.
+  assert.equal(await verifyProvenance(bundleDocument(statementFixture()), metadata, options), true);
+  assert.equal(verifications, 2);
+  await assert.rejects(verifyProvenance(bundleDocument(statementFixture()), metadata, { ...options, expectedInvocation: `${repositoryURL}/actions/runs/999/attempts/1` }), /Fresh publish/);
+  for (const mutate of [
+    s => { s.predicate.buildDefinition.resolvedDependencies[0].digest.gitCommit = commit; },
+    s => { s.predicate.buildDefinition.externalParameters.workflow.ref = 'refs/tags/v1.2.3'; },
+    s => { s.predicate.buildDefinition.externalParameters.workflow.path = 'other.yml'; },
+    s => { s.subject[0].digest.sha512 = '0'.repeat(128); },
+    s => { s.predicate.runDetails.metadata.invocationId = 'https://github.com/fork/repo/actions/runs/123/attempts/1'; },
+  ]) {
+    const statement = statementFixture(); mutate(statement);
+    await assert.rejects(verifyProvenance(bundleDocument(statement), metadata, options));
+  }
+  await assert.rejects(verifyProvenance(bundleDocument(statementFixture()), metadata, { ...options, verify: async () => { throw Error('certificate source mismatch'); } }), /certificate source mismatch/);
+});
+
+test('tag-push provenance must match the release commit as well as the original run', async () => {
+  const statement = statementFixture();
+  const ref = 'refs/tags/v1.2.3';
+  statement.predicate.buildDefinition.externalParameters.workflow.ref = ref;
+  statement.predicate.buildDefinition.internalParameters.github.event_name = 'push';
+  statement.predicate.buildDefinition.resolvedDependencies = [{ uri: `git+${repositoryURL}@${ref}`, digest: { gitCommit: commit } }];
+  const run = { ...publishingRun, event: 'push', head_branch: 'v1.2.3', head_sha: commit };
+  assert.equal(await verifyProvenance(bundleDocument(statement), metadata, { getRun: async () => run, verify: async () => {} }), true);
+  await assert.rejects(verifyProvenance(bundleDocument(statement), metadata, { getRun: async () => ({ ...run, head_sha: workflowCommit }), verify: async () => {} }));
+});
+
+test('uncached preflight and bounded polling tolerate delayed version and attestation visibility', async () => {
+  await registryState('1.2.4', commit, async url => {
+    assert.equal(url, `https://registry.npmjs.org/${config.name}?write=true`);
+    return new Response(JSON.stringify(document));
+  });
+  const responses = [new Response('{}', { status: 404 }), new Response(JSON.stringify(metadata)),
+    new Response(JSON.stringify(published)), new Response('{}', { status: 404 }),
+    new Response(JSON.stringify(published)), new Response(JSON.stringify({ attestations: [] })),
+    new Response(JSON.stringify(published)), new Response(JSON.stringify(bundleDocument(statementFixture())))];
+  const sleeps = [];
+  const result = await waitPublication('1.2.3', commit, {
+    attempts: 5, sleep: async ms => sleeps.push(ms), fetcher: async url => {
+      assert.ok([`https://registry.npmjs.org/${config.name}/1.2.3`, published.dist.attestations.url].includes(url));
+      assert.ok(responses.length); return responses.shift();
+    }, provenance: (doc, meta) => verifyProvenance(doc, meta, { getRun: async () => publishingRun, verify: async () => {} }),
+  });
+  assert.equal(result.gitHead, commit);
+  assert.deepEqual(sleeps, [2000, 4000, 8000, 16000]);
+  assert.equal(responses.length, 0);
+});
+
+test('fresh, existing-version retry and archive all require provenance; errors cannot become absence', async () => {
+  for (const path of ['fresh', 'existing-version retry', 'archive']) {
+    let calls = 0;
+    await assert.rejects(waitPublication('1.2.3', commit, { attempts: 3, sleep: async () => {}, fetcher: async () => {
+      calls++; return new Response(JSON.stringify(metadata));
+    } }), /verified provenance not ready/, path);
+    assert.equal(calls, 3);
+  }
+  for (const status of [401, 403, 429, 500]) {
+    let calls = 0;
+    await assert.rejects(waitPublication('1.2.3', commit, { sleep: async () => {}, fetcher: async () => { calls++; return new Response('{}', { status }); } }), /Version read HTTP/);
+    assert.equal(calls, 1);
+  }
+  await assert.rejects(waitPublication('1.2.3', commit, { fetcher: mock({ ...metadata, gitHead: workflowCommit }) }), /gitHead/);
+  await assert.rejects(waitPublication('1.2.3', commit, { fetcher: mock({ ...published, dist: { ...published.dist, attestations: { url: 'https://evil.example', provenance: { predicateType: provenanceType } } } }) }), /Unexpected attestation URL/);
+});
+
+test('release visibility wait is bounded and surfaces errors without retrying mutations', async () => {
+  let reads = 0;
+  const release = { tag_name: 'v1.2.3', draft: false };
+  assert.equal(await pollReady('release', async () => ++reads === 3 ? release : null, { attempts: 3, sleep: async () => {} }), release);
+  await assert.rejects(pollReady('release', async () => null, { attempts: 2, sleep: async () => {} }), /not ready after 2/);
+  await assert.rejects(pollReady('release', async () => { throw Error('HTTP 403'); }), /HTTP 403/);
 });
 
 test('real Git fixture resolves old and annotated tags, rejects unreachable tags and dirty/worktree source', () => {

@@ -28,6 +28,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      actions: read # Verify the original publishing run/attempt in provenance.
       id-token: write
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
@@ -72,6 +73,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -83,6 +85,7 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
+      - run: npm install --global npm@11.21.1 --registry=https://registry.npmjs.org
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ needs.publish.outputs.commit }}

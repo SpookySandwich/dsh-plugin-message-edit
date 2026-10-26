@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import { setTimeout as delay } from 'node:timers/promises';
 
 export const config = { name: 'dsh-plugin-message-edit', branch: 'master' };
 const repository = `SpookySandwich/${config.name}`;
@@ -96,7 +98,7 @@ export function verifyBytes(bytes, integrity) {
 export async function registryState(version, commit, fetcher = fetch) {
   // A valid existing package document is required. 404/auth/network/malformed
   // responses are never evidence that a version is safe to publish.
-  const document = await (await request(`${registry}/${config.name}`, fetcher)).json();
+  const document = await (await request(`${registry}/${config.name}?write=true`, fetcher)).json();
   assert.equal(document.name, config.name, 'Invalid registry package document');
   assert.ok(document.versions && typeof document.versions === 'object' && !Array.isArray(document.versions), 'Invalid registry versions');
   assert.ok(Object.keys(document.versions).length, 'Expected an existing npm package');
@@ -118,17 +120,128 @@ async function archiveBytes(metadata) {
   return bytes;
 }
 
-function existingRelease(tag) {
-  const release = gh(`releases/tags/${tag}`);
-  assert.equal(release.tag_name, tag);
-  assert.equal(release.draft, false, 'Existing release must be public');
-  return release;
+export async function pollReady(label, read, { attempts = 12, sleep = delay } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const result = await read(); // Auth/network/malformed/collision errors fail immediately.
+    if (result) return result;
+    if (attempt + 1 < attempts) await sleep(Math.min(2000 * 2 ** attempt, 30_000));
+  }
+  throw Error(`${label} not ready after ${attempts} attempts; inspect and rerun, never republish blindly`);
+}
+
+async function existingRelease(tag) {
+  return pollReady(`Public GitHub release ${tag}`, async () => {
+    let release;
+    try { release = gh(`releases/tags/${tag}`); }
+    catch (error) {
+      if (/\(HTTP 404\)/.test(error.stderr?.toString() ?? '')) return null;
+      throw error;
+    }
+    assert.equal(release.tag_name, tag);
+    if (release.draft) return null;
+    assert.equal(release.immutable, false, 'Immutable release cannot accept an archive; review release policy manually');
+    return release;
+  });
+}
+
+const predicateType = 'https://slsa.dev/provenance/v1';
+const repositoryURL = `https://github.com/${repository}`;
+
+// Verify the original publishing run, not necessarily this retry/repair run.
+export function provenanceContext(statement, metadata, publishingRun) {
+  assert.equal(statement._type, 'https://in-toto.io/Statement/v1');
+  assert.equal(statement.predicateType, predicateType);
+  assert.deepEqual(statement.subject, [{ name: `pkg:npm/${config.name}@${metadata.version}`,
+    digest: { sha512: Buffer.from(metadata.dist.integrity.slice(7), 'base64').toString('hex') } }], 'Attestation subject differs from npm archive');
+  const { buildDefinition: build, runDetails } = statement.predicate;
+  assert.equal(build.buildType, 'https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1');
+  assert.equal(runDetails.builder.id, 'https://github.com/actions/runner/github-hosted');
+  assert.equal(publishingRun.repository.full_name, repository);
+  assert.equal(publishingRun.path, '.github/workflows/publish.yml', 'Unexpected publishing workflow');
+  assert.match(publishingRun.head_sha, /^[a-f0-9]{40}$/);
+  const event = publishingRun.event;
+  assert.ok(['workflow_dispatch', 'push'].includes(event), 'Unexpected publishing event');
+  const ref = event === 'workflow_dispatch' ? `refs/heads/${config.branch}` : `refs/tags/v${metadata.version}`;
+  assert.equal(publishingRun.head_branch, event === 'workflow_dispatch' ? config.branch : `v${metadata.version}`);
+  assert.deepEqual(build.externalParameters.workflow, { ref, repository: repositoryURL, path: '.github/workflows/publish.yml' });
+  assert.equal(build.internalParameters.github.event_name, event);
+  assert.deepEqual(build.resolvedDependencies, [{ uri: `git+${repositoryURL}@${ref}`, digest: { gitCommit: publishingRun.head_sha } }], 'Provenance must describe the actual workflow run, not a substituted release checkout');
+  const invocation = `${repositoryURL}/actions/runs/${publishingRun.id}/attempts/${publishingRun.run_attempt}`;
+  assert.equal(runDetails.metadata.invocationId, invocation);
+  if (event === 'push') assert.equal(publishingRun.head_sha, metadata.gitHead, 'Tag push must run at the release source');
+  return { ref, sha: publishingRun.head_sha, event, invocation, workflow: `${repositoryURL}/.github/workflows/publish.yml@${ref}` };
+}
+
+function derString(text) {
+  const bytes = Buffer.from(text);
+  assert.ok(bytes.length < 256);
+  return Buffer.concat([Buffer.from(bytes.length < 128 ? [0x0c, bytes.length] : [0x0c, 0x81, bytes.length]), bytes]);
+}
+
+export function certificatePolicy(context) {
+  const oid = suffix => `1.3.6.1.4.1.57264.1.${suffix}`;
+  return {
+    certificateIssuer: 'https://token.actions.githubusercontent.com',
+    certificateIdentityURI: `^${context.workflow.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    certificateOIDs: Object.fromEntries([
+      [9, context.workflow], [11, 'github-hosted'], [12, repositoryURL],
+      [13, context.sha], [14, context.ref], [20, context.event], [21, context.invocation],
+    ].map(([suffix, value]) => [oid(suffix), derString(value)])),
+  };
+}
+
+async function verifySignature(bundle, context) {
+  // Reuse the Sigstore verifier shipped in the exact npm version installed in
+  // both jobs. No dependencies or scripts are loaded from the release checkout.
+  assert.equal(run('npm', ['--version']), '11.21.1');
+  const requireNpm = createRequire(join(run('npm', ['root', '--global']), 'npm', 'package.json'));
+  await requireNpm('sigstore').verify(bundle, certificatePolicy(context));
+}
+
+export async function verifyProvenance(document, metadata, { getRun = async path => gh(path), verify = verifySignature, expectedInvocation } = {}) {
+  assert.ok(Array.isArray(document.attestations), 'Malformed attestation document');
+  const matches = document.attestations.filter(item => item.predicateType === predicateType);
+  if (!matches.length) return false; // Bounded propagation wait, never success.
+  assert.equal(matches.length, 1, 'Ambiguous provenance');
+  const bundle = matches[0].bundle;
+  assert.equal(bundle.dsseEnvelope.payloadType, 'application/vnd.in-toto+json');
+  const statement = JSON.parse(Buffer.from(bundle.dsseEnvelope.payload, 'base64').toString());
+  const invocation = statement.predicate?.runDetails?.metadata?.invocationId;
+  const prefix = `${repositoryURL}/actions/runs/`;
+  assert.ok(invocation?.startsWith(prefix), 'Unexpected attestation run repository');
+  const match = /^(\d+)\/attempts\/(\d+)$/.exec(invocation.slice(prefix.length));
+  assert.ok(match, 'Invalid attestation run');
+  if (expectedInvocation) assert.equal(invocation, expectedInvocation, 'Fresh publish must attest this run');
+  const publishingRun = await getRun(`actions/runs/${match[1]}/attempts/${match[2]}`);
+  const context = provenanceContext(statement, metadata, publishingRun);
+  await verify(bundle, context); // Signature, trust root, transparency log, issuer/SAN and source OIDs.
+  return true;
+}
+
+export async function waitPublication(version, commit, { fetcher = fetch, provenance = verifyProvenance, ...pollOptions } = {}) {
+  return pollReady(`npm ${config.name}@${version} and verified provenance`, async () => {
+    const response = await fetcher(`${registry}/${config.name}/${version}`, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    if (response.status === 404) return null; // Only a visibility wait, never permission to publish.
+    assert.equal(response.status, 200, `Version read HTTP ${response.status}`);
+    const metadata = await response.json();
+    verifyMetadata(metadata, version, commit);
+    const attestation = metadata.dist.attestations;
+    if (!attestation) return null;
+    assert.equal(attestation.provenance?.predicateType, predicateType, 'Missing SLSA provenance');
+    assert.equal(attestation.url, `${registry}/-/npm/v1/attestations/${config.name}@${version}`, 'Unexpected attestation URL');
+    const result = await fetcher(attestation.url, { signal: AbortSignal.timeout(30_000), redirect: 'error' });
+    if (result.status === 404) return null;
+    assert.equal(result.status, 200, `Attestation read HTTP ${result.status}`);
+    if (!await provenance(await result.json(), metadata)) return null;
+    return metadata;
+  }, pollOptions);
 }
 
 export async function ensureAsset(release, filename, bytes, integrity, adapter) {
   const matches = release.assets.filter(asset => asset.name === filename);
   assert.ok(matches.length <= 1, 'Duplicate release assets');
   if (matches.length) {
+    assert.equal(matches[0].state, 'uploaded', `Asset ${filename} is unfinished (id ${matches[0].id}); inspect it in GitHub and explicitly remove only the failed asset before rerunning. No automatic overwrite or deletion.`);
     verifyBytes(await adapter.download(matches[0]), integrity);
     return; // Never overwrite an existing asset, even on retries.
   }
@@ -136,7 +249,14 @@ export async function ensureAsset(release, filename, bytes, integrity, adapter) 
   const refreshed = await adapter.refresh();
   const asset = refreshed.assets.find(item => item.name === filename);
   assert.ok(asset, 'Uploaded archive missing');
+  assert.equal(asset.state, 'uploaded', `Asset ${filename} upload is unfinished; inspect and manually recover before rerunning`);
   verifyBytes(await adapter.download(asset), integrity);
+}
+
+export function publishDirectory(distTag, execute = run) {
+  assert.ok(['latest', 'backfill'].includes(distTag));
+  // Inherit all GitHub context directly; never substitute the release checkout.
+  execute('npm', ['publish', '--access=public', '--provenance', `--registry=${registry}`, `--tag=${distTag}`], { stdio: 'inherit' });
 }
 
 async function main(mode) {
@@ -159,7 +279,7 @@ async function main(mode) {
   cleanSource(commit);
   const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
   checkPackage(pkg, tag);
-  const release = existingRelease(tag); // Fail before publishing if release is absent.
+  const release = await existingRelease(tag); // Writer pushes the tag before creating the release.
   let state = await registryState(version, commit);
   if (mode === 'publish') {
     assert.equal(process.versions.node.split('.')[0], '24', 'Release runtime must be Node 24');
@@ -177,22 +297,20 @@ async function main(mode) {
     cleanSource(commit);
     unchangedRemoteTag(tag, commit);
     state = await registryState(version, commit);
+    let expectedInvocation;
     if (!state.metadata) {
-      // Provenance source is the immutable release checkout. Workflow/OIDC
-      // identity remains the executing publish.yml (default branch on dispatch).
-      run('npm', ['publish', '--access=public', '--provenance', `--registry=${registry}`, `--tag=${state.distTag}`], {
-        stdio: 'inherit', env: { ...process.env, GITHUB_SHA: commit, GITHUB_REF: `refs/tags/${tag}` },
-      });
+      // Preserve GitHub's actual run context, including SHA/REF. On dispatch the
+      // attested source is the default-branch run; gitHead identifies release source.
+      publishDirectory(state.distTag);
       cleanSource(commit);
-      state = await registryState(version, commit);
-      assert.ok(state.metadata, 'Published metadata not visible yet; rerun to verify, never blindly republish');
-      assert.ok(state.metadata.dist.attestations?.url, 'New OIDC publication is missing provenance');
+      expectedInvocation = `${repositoryURL}/actions/runs/${process.env.GITHUB_RUN_ID}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
     }
+    state.metadata = await waitPublication(version, commit, { provenance: (document, metadata) => verifyProvenance(document, metadata, { expectedInvocation }) });
     await archiveBytes(state.metadata);
     console.log(`Verified npm ${config.name}@${version} at ${commit}`);
     return;
   }
-  assert.ok(state.metadata, 'Version must already be published');
+  state.metadata = await waitPublication(version, commit);
   const bytes = await archiveBytes(state.metadata);
   const filename = `${config.name}-${version}.tgz`;
   const archivePath = join(process.env.RUNNER_TEMP, filename);
@@ -209,8 +327,8 @@ async function main(mode) {
     refresh: async () => existingRelease(tag),
   });
   unchangedRemoteTag(tag, commit);
-  const verified = await registryState(version, commit);
-  assert.equal(verified.metadata?.dist.integrity, state.metadata.dist.integrity, 'Registry integrity changed');
+  const verified = await waitPublication(version, commit);
+  assert.equal(verified.dist.integrity, state.metadata.dist.integrity, 'Registry integrity changed');
   console.log(`Verified public release ${tag}: gitHead, tag and identical npm/GitHub archive bytes`);
 }
 
