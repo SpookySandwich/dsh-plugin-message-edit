@@ -975,6 +975,45 @@ return {
         stopOnEditHint: '编辑或重试时，先取消该会话中所有仍在生成的回复（包括其它版本）再分支，避免被取代的回答继续消耗额度；同时允许在回复过程中直接编辑。关闭后它们会继续跑完。',
         previewUser: '把这段话改写得更简洁一些。',
       },
+      ru: {
+        view: 'Версии',
+        edit: 'Редактировать сообщение',
+        cancel: 'Отмена',
+        send: 'Отправить',
+        save: 'Сохранить',
+        copy: 'Копировать',
+        copied: 'Скопировано',
+        retry: 'Повторить этот ход',
+        regen: 'Сгенерировать заново отсюда',
+        original: 'Исходный разговор',
+        turn: 'Ход {turn}',
+        edited: 'Изменён ход {turn}',
+        retried: 'Перегенерирован ход {turn}',
+        branch: 'Ветка',
+        refresh: 'Обновить',
+        fit: 'По центру',
+        empty: 'Версий пока нет — отредактируйте любое своё сообщение, чтобы создать ветку. Тяните для панорамы, колесо — масштаб.',
+        images: 'Изображений сохранено как есть: {count}',
+        imageLoading: 'Загрузка изображения…',
+        imageUnavailable: 'Изображение недоступно',
+        imageOpen: 'Открыть изображение',
+        nav: 'Редактирование сообщений',
+        styleLabel: 'Стиль интерфейса редактирования',
+        styleHint: 'Расположение и набор кнопок у сообщений. Изменения применяются сразу.',
+        style_chatgpt: 'ChatGPT',
+        style_deepseek: 'DeepSeek',
+        style_claude: 'Claude',
+        styleDesc_chatgpt: 'Копировать и редактировать под пузырём, появляются при наведении. «Отмена» и «Отправить» внутри редактора.',
+        styleDesc_deepseek: 'Копировать и редактировать под пузырём, всегда видны — ближе всего к самому DSH. «Отмена» и «Отправить» внутри редактора.',
+        styleDesc_claude: 'Повторить, редактировать и копировать под пузырём, появляются при наведении. «Отмена» и «Сохранить» под редактором.',
+        deletedVersion: 'Удалённая версия',
+        archivedTag: 'В архиве',
+        rememberPathLabel: 'Запоминать версию, которую я смотрел',
+        rememberPathHint: 'При открытии разговора возвращаться к последней открытой ветке, а не к исходной. Выключено — всегда открывается первая версия.',
+        stopOnEditLabel: 'Останавливать текущий ответ при редактировании',
+        stopOnEditHint: 'При редактировании или повторе отменить все ещё генерирующиеся ответы в этом разговоре, включая другие версии, прежде чем создавать ветку. Это же позволяет редактировать во время ответа. Выключено — они продолжают генерироваться.',
+        previewUser: 'Перепиши этот абзац короче.',
+      },
     };
     let t = function (key, params) {
       let out = I18N.en[key] || key;
@@ -986,6 +1025,12 @@ return {
       if (locale && typeof locale.register === 'function' && typeof locale.bind === 'function') {
         ctx.effect(function () { return locale.register(I18N_NS, I18N); });
         t = locale.bind(I18N_NS);
+        // Dictionaries do not add selectable languages to DSH's catalog.
+        // Respect an existing language pack and dispose only our own entry.
+        if (typeof locale.addLanguage === 'function' && typeof locale.getSnapshot === 'function'
+          && !locale.getSnapshot().locales.some(function (language) { return language.id.toLowerCase() === 'ru'; })) {
+          ctx.effect(function () { return locale.addLanguage({ id: 'ru', label: 'Русский', fallback: 'en' }); });
+        }
       }
     } catch (e) {
       console.warn('[dsh-plugin-message-edit] Failed to register translations; using English.', e);

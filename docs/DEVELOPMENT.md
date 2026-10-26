@@ -59,6 +59,11 @@ fresh checkout before running tests (Node 22.19+ or Node 24).
   and checks image delegation, multiple/image-only messages, old-host fallback,
   text-only messages, and entering/cancelling an edit. Host services and the image
   gallery are test doubles; these are not full DSH integration tests.
+- `test/client-locale.test.mjs`: exercises the generated client against the
+  published `@deepseek-ai/dsh-client-locale` runtime (`test/fixtures/locale-runtime.mjs`),
+  checking 37-key parity, placeholder parity, Russian lookup and interpolation,
+  language-catalog registration (`Русский`), `ru-RU` browser detection,
+  English fallback, preloaded language-pack respect, and disposal cleanup.
 - `test/client-registration.test.mjs`: checks module dependencies and visible
   failures when services or registrations are unavailable.
 - `test/session-record.test.mjs` and `test/host-compatibility.test.mjs`: cover
@@ -134,12 +139,12 @@ CI runs this on Linux and Windows in addition to the regression suite.
 npm run build
 npm pack
 ```
-This produces a tarball: `dsh-plugin-message-edit-1.3.1.tgz`.
+This produces a tarball: `dsh-plugin-message-edit-1.4.0.tgz`.
 
 ### Step 2: Install into DSH Profile
 To install into the DSH Desktop profile:
 ```bash
-dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.3.1.tgz
+dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.4.0.tgz
 ```
 Or sync files directly into `~/.dsh/profiles/desktop/node_modules/dsh-plugin-message-edit/`.
 

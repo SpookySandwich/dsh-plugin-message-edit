@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
+import { createLocale } from './fixtures/locale-runtime.mjs';
 
 const bundle = readFileSync(new URL('../lib/client.js', import.meta.url), 'utf8');
 const photo = id => ({ type: 'image', attachment: { id, attachmentId: `sha256:${id}`, name: `${id}.png`, mediaType: 'image/png' } });
@@ -68,7 +69,7 @@ async function mount(t, content, renderMessageImages, options = {}) {
     get(name) { return name === 'slots' ? slots : name === 'sessions' ? {
       list: { subscribe: () => () => {}, getSnapshot: () => ({ byId: Object.fromEntries(
         ['session-test', ...(options.versions ?? []).map(version => version.sessionId)].map(id => [id, { id }])) }) },
-    } : name === 'uiWorkspace' ? { openSession: options.open ?? (() => {}) } : undefined; },
+    } : name === 'uiWorkspace' ? { openSession: options.open ?? (() => {}) } : name === 'locale' ? options.locale : undefined; },
     effect(fn) { const dispose = fn(); if (typeof dispose === 'function') disposers.push(dispose); },
   });
   assert.equal(typeof component, 'function', 'The user-message slot must register');
@@ -212,6 +213,37 @@ function deferred() {
   const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
   return { promise, resolve, reject };
 }
+
+test('Russian fallback images show loading, open and unavailable messages through the official locale', async t => {
+  const pending = deferred();
+  const locale = createLocale(['ru-RU']);
+  const doc = await mount(t, [photo('ru')], undefined, { locale, props: { loadImage: () => pending.promise } });
+  assert.equal(doc.querySelector('[role="status"]').textContent, 'ru.png: Загрузка изображения…');
+  await act(async () => pending.resolve('/ru.png'));
+  assert.equal(doc.querySelector('.mtx-thumb').title, 'Открыть изображение');
+  await act(async () => doc.querySelector('img').dispatchEvent(new doc.defaultView.Event('error')));
+  assert.equal(doc.querySelector('[role="status"]').textContent, 'ru.png: Изображение недоступно');
+});
+
+test('Russian native-factory fallback and edit/cancel preserve images and translated retention notice', async t => {
+  const locale = createLocale(['ru']);
+  const doc = await mount(t, [text('Photo'), photo('one'), { type: 'image' }], undefined, { locale, props: {
+    loadImage: async () => '/one.png',
+    renderFactorySlot(_name, _props, options) { return options.fallback; },
+  } });
+  assert.ok(doc.querySelector('.mtx-native-images img'));
+  assert.match(doc.body.textContent, /Изображение недоступно/);
+  assert.equal(doc.querySelector('[data-act="edit"]').title, 'Редактировать сообщение');
+  await act(async () => doc.querySelector('[data-act="edit"]').click());
+  assert.equal(doc.querySelector('.mtx-img').textContent, 'Изображений сохранено как есть: 2');
+  await act(async () => [...doc.querySelectorAll('button')].find(button => button.textContent === 'Отмена').click());
+  assert.ok(doc.querySelector('.mtx-native-images img'));
+});
+
+test('Russian image retention fallback works when no image renderer is supplied', async t => {
+  const doc = await mount(t, [photo('one')], undefined, { locale: createLocale(['ru']) });
+  assert.equal(doc.querySelector('.mtx-img').textContent, 'Изображений сохранено как есть: 1');
+});
 
 test('pending loads never become src values; rebind ignores stale resolutions and clears a previous URL', async t => {
   const controls = {};
