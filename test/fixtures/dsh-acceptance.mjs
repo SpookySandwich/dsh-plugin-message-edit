@@ -104,5 +104,21 @@ export async function apply(ctx) {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end('{}');
   } });
+  ctx.webServer.register({ kind: 'exact', path: '/qa/image-only', handler: async (req, res) => {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const { text = '', count = 1 } = JSON.parse(body || '{}');
+    assert.ok(typeof text === 'string' && (count === 1 || count === 2), 'Use one or two fixture images');
+    const agent = ctx.agents.get('session-qa-live');
+    assert.equal(agent?.session.header.cwd, cwd, 'Only this disposable fixture workspace may be changed');
+    agent.followup(createUserMessage({ source: { kind: 'user' }, content: [
+      ...(text ? [{ type: 'text', text }] : []),
+      ...refs.slice(0, count).map(attachment => ({ type: 'image', attachment })),
+    ] }));
+    await agent.whenIdle();
+    await ctx.sessions.flush(agent.session);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{}');
+  } });
   console.log('QA fixtures ready: real live/cold DSH agents with an offline model.');
 }

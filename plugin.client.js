@@ -755,11 +755,15 @@ const CSS = [
   // hover-revealed edit control to its left, ChatGPT-style.
   '.mtx-row{display:flex;flex-direction:column;align-items:flex-end;gap:6px}',
   '.mtx-line{display:flex;align-items:flex-start;gap:8px;max-width:min(85%,720px)}',
+  '.mtx-native-images{display:flex;justify-content:flex-end;width:100%;min-width:0}',
   '.mtx-edit-btn{flex:none;margin-top:8px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;border:0;background:transparent;color:var(--dsw-alias-label-tertiary);cursor:pointer;opacity:0;transition:opacity 120ms ease,background 120ms ease}',
   '.mtx-row:hover .mtx-edit-btn{opacity:1}',
   '.mtx-edit-btn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}',
   '.mtx-bubble{background:var(--dsw-alias-interactive-bg-hover,rgba(140,140,150,.14));border-radius:16px;padding:10px 16px;font-size:15px;line-height:26px;color:var(--dsw-alias-label-primary);white-space:pre-wrap;overflow-wrap:anywhere}',
   '.mtx-img{font-size:12px;color:var(--dsw-alias-label-tertiary);margin-top:4px}',
+  '.mtx-thumbs{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:8px}',
+  '.mtx-thumb{display:block;max-width:100%;border:0;padding:0;background:none;cursor:zoom-in}',
+  '.mtx-thumb img{display:block;max-width:100%;max-height:320px;border-radius:8px}',
 
   // Inline editor, ChatGPT-style: the bubble grows into an editing surface
   // with Cancel / Send below-right.
@@ -912,6 +916,9 @@ return {
         fit: 'Center view',
         empty: 'No versions yet — edit any of your messages to branch this conversation. Drag to pan, scroll to zoom.',
         images: '{count} image(s) kept as-is',
+        imageLoading: 'Loading image…',
+        imageUnavailable: 'Image unavailable',
+        imageOpen: 'Open image',
         nav: 'Message Edit',
         styleLabel: 'Edit interface style',
         styleHint: 'Where the message controls sit and which ones appear. Changes apply live.',
@@ -948,6 +955,9 @@ return {
         fit: '居中显示',
         empty: '还没有版本——编辑任意一条你的消息即可创建分支。拖动平移，滚轮缩放。',
         images: '{count} 张图片将原样保留',
+        imageLoading: '图片加载中…',
+        imageUnavailable: '图片不可用',
+        imageOpen: '打开图片',
         nav: '消息编辑',
         styleLabel: '编辑界面风格',
         styleHint: '消息操作按钮的位置与种类。修改即时生效。',
@@ -1034,12 +1044,79 @@ return {
       );
     }
 
+    function ImageThumb({ attachment, loadImage }) {
+      // Associate state with both inputs. A session switch can reuse a component
+      // and an attachment while replacing the authorized loader; never show the
+      // previous session's URL, even on the render before effect cleanup.
+      const [result, setResult] = React.useState(null);
+      const current = result && result.attachment === attachment && result.loadImage === loadImage ? result : null;
+      React.useEffect(function () {
+        let alive = true;
+        function finish(url) {
+          if (alive) setResult({ attachment, loadImage, url: typeof url === 'string' && url.trim() ? url : null });
+        }
+        if (!attachment || typeof loadImage !== 'function') {
+          finish(null);
+          return undefined;
+        }
+        // peek is only a synchronous optimization; a failed cache read must not
+        // prevent an authoritative load. The host owns/revokes its object URLs.
+        let cached;
+        try { cached = typeof loadImage.peek === 'function' ? loadImage.peek(attachment) : undefined; } catch (e) {}
+        if (typeof cached === 'string' && cached.trim()) finish(cached);
+        else Promise.resolve().then(function () { return loadImage(attachment); }).then(finish, function () { finish(null); });
+        return function () { alive = false; };
+      }, [attachment, loadImage]);
+      const url = current && current.url;
+      if (!url) return React.createElement('span', { className: 'mtx-img', role: 'status' },
+        (attachment && attachment.name ? attachment.name + ': ' : '') + t(current ? 'imageUnavailable' : 'imageLoading'));
+      return React.createElement('button', {
+        type: 'button', className: 'mtx-thumb', title: t('imageOpen'),
+        onClick: function () { const g = realGlobal(); if (g) g.open(url, '_blank', 'noopener,noreferrer'); },
+      }, React.createElement('img', {
+        src: url, alt: attachment.name || t('imageOpen'), loading: 'lazy',
+        onError: function () { setResult({ attachment, loadImage, url: null }); },
+      }));
+    }
+
+    function MessageImages({ images, count, loadImage, renderMessageImages, renderFactorySlot, sessionId }) {
+      if (!count) return null;
+      const missing = count - images.length;
+      const notice = missing > 0 ? React.createElement('span', { className: 'mtx-img', role: 'status' }, t('imageUnavailable')) : null;
+      let gallery;
+      if (images.length && typeof renderMessageImages === 'function') {
+        gallery = renderMessageImages({ images, align: 'end' });
+      } else if (images.length && typeof loadImage === 'function') {
+        const fallback = React.createElement('div', { className: 'mtx-thumbs' }, images.map(function (part, index) {
+          return React.createElement(ImageThumb, { key: index, attachment: part.attachment, loadImage });
+        }));
+        // DSH 0.2.1 owns its images child on this reusable content factory.
+        // Rendering that factory retains the native gallery/lightbox without
+        // declaring the already-owned conversation.chat.user.images slot again.
+        gallery = typeof renderFactorySlot === 'function'
+          ? renderFactorySlot('conversation.chat.user.content', {
+            content: { text: '', attachments: images.map(function (image) { return { type: 'image', image }; }), extraBlocks: [] },
+            loadImage,
+          }, { fallback })
+          : fallback;
+      } else if (images.length) {
+        gallery = React.createElement('div', { className: 'mtx-img' }, t('images', { count: images.length }));
+      }
+      return React.createElement(React.Fragment, { key: sessionId }, gallery, notice);
+    }
+
     function UserMessageView(props) {
       const node = props.node;
       const data = node.data || {};
       const text = contentText(data.content);
       const images = imageCount(data.content);
       const messageImages = imageParts(data.content);
+      // The reusable host content factory owns an entire user-content stack,
+      // including a percentage width limit. Give it the full row as its sizing
+      // context, rather than nesting that stack inside our shrink-to-fit bubble.
+      const nativeImages = messageImages.length > 0
+        && typeof props.renderMessageImages !== 'function'
+        && typeof props.loadImage === 'function' && typeof props.renderFactorySlot === 'function';
       const sessionId = props.sessionId !== undefined ? props.sessionId : (node.sessionId);
       // location.turn is a turn-group object ({turn, start, end, steps}); the
       // turn number lives one level down.
@@ -1227,18 +1304,19 @@ return {
         );
       }
 
+      const imageView = React.createElement(MessageImages, {
+        images: messageImages, count: images, sessionId,
+        loadImage: props.loadImage, renderMessageImages: props.renderMessageImages,
+        renderFactorySlot: props.renderFactorySlot,
+      });
       return React.createElement('div', { className: 'mtx-row', 'data-turn': turn, 'data-session': sessionId },
-        React.createElement('div', { className: 'mtx-line' },
+        nativeImages ? React.createElement('div', { className: 'mtx-native-images' }, imageView) : null,
+        !nativeImages || text ? React.createElement('div', { className: 'mtx-line' },
           React.createElement('div', { className: 'mtx-bubble' },
             text,
-            // The host renders attachments through its images slot (native
-            // gallery plus lightbox); keep the placeholder only when the slot
-            // owner props do not carry the callback.
-            messageImages.length > 0 && typeof props.renderMessageImages === 'function'
-              ? props.renderMessageImages({ images: messageImages, align: 'end' })
-              : (images > 0 ? React.createElement('div', { className: 'mtx-img' }, t('images', { count: images })) : null)
+            nativeImages ? null : imageView
           )
-        ),
+        ) : null,
         // The controls sit under the bubble in all three references. Which
         // ones exist, and whether they wait for hover, is what differs.
         React.createElement('div', { className: 'mtx-actions' },

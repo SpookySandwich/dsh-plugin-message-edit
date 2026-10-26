@@ -72,7 +72,9 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
-版本 `1.3.0`（当前源码）：在兼容范围中显式纳入官方 dsh `0.2.1-rc.2`，并在官方 `0.2.0-rc.2` 与 `0.2.1-rc.2` 运行时验证编辑、重试与重启恢复。
+版本 `1.3.1`（当前源码）：当宿主不再传入旧版 `renderMessageImages` 回调时，通过宿主 `conversation.chat.user.content` 工厂恢复用户消息图片与原图预览，并提供基于 `loadImage` / `loadImage.peek` 的异步缩略图兜底。
+
+版本 `1.3.0`：在兼容范围中显式纳入官方 dsh `0.2.1-rc.2`，并在官方 `0.2.0-rc.2` 与 `0.2.1-rc.2` 运行时验证编辑、重试与重启恢复。
 
 版本 `1.2.1`：修复 DSH 0.2 客户端加载，编辑、重试及版本切换改用 `uiWorkspace.openSession` 导航。
 
@@ -82,7 +84,7 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2`；官方 dsh `0.2.0-rc.2` 与 `0.2.1-rc.2` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/dsh-0.1.5.md)。
 
-已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.3.0.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
+已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.3.1.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
 
 `1.1.0` 已在 DSH `0.1.5-rc.2` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
 

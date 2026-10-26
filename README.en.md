@@ -72,7 +72,9 @@ For technical details and developer guides, see:
 
 ## Compatibility
 
-Version `1.3.0` (current source): Admit official dsh `0.2.1-rc.2` in declared compatibility ranges and verify live/persisted edits and retries on official `0.2.0-rc.2` and `0.2.1-rc.2` runtimes.
+Version `1.3.1` (current source): Render user message images through the host `conversation.chat.user.content` factory (preserving the native gallery and lightbox) when the legacy `renderMessageImages` callback is absent, with an async `loadImage` / `loadImage.peek` thumbnail fallback.
+
+Version `1.3.0`: Admit official dsh `0.2.1-rc.2` in declared compatibility ranges and verify live/persisted edits and retries on official `0.2.0-rc.2` and `0.2.1-rc.2` runtimes.
 
 Version `1.2.1`: Fix DSH 0.2 client activation and route edits, retries, and version switching through `uiWorkspace.openSession`.
 
@@ -82,7 +84,7 @@ Version `1.1.0`: Fix seeded edit/retry creation, clear inherited pending input b
 
 The declared host range is `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2`; official dsh `0.2.0-rc.2` and `0.2.1-rc.2` satisfy it. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/dsh-0.1.5.md).
 
-Install published versions from [npm](https://www.npmjs.com/package/dsh-plugin-message-edit). To test the current source, run `npm ci` and `npm pack`, then `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.3.0.tgz`. See the [release procedure](.github/RELEASING.md) for publication checks.
+Install published versions from [npm](https://www.npmjs.com/package/dsh-plugin-message-edit). To test the current source, run `npm ci` and `npm pack`, then `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.3.1.tgz`. See the [release procedure](.github/RELEASING.md) for publication checks.
 
 Version `1.1.0` has been verified in an isolated DSH `0.1.5-rc.2` Web environment:
 plugin loading, images, edit/retry, nested branches, and restored sessions. Model
