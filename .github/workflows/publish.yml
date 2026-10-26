@@ -20,7 +20,10 @@ concurrency:
 
 jobs:
   publish:
-    if: github.repository == 'SpookySandwich/dsh-plugin-message-edit'
+    if: >-
+      github.repository == 'SpookySandwich/dsh-plugin-message-edit' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

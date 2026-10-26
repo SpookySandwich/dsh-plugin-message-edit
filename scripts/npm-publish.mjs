@@ -69,6 +69,7 @@ export function checkPackage(pkg, tag) {
   assert.equal(pkg.version, versionOf(tag), 'Tag/package version mismatch');
   assert.equal(pkg.repository?.url, `git+https://github.com/${repository}.git`, 'Wrong package repository');
   assert.ok(!pkg.private, 'Package is private');
+  assert.ok(!Object.hasOwn(pkg, 'gitHead'), 'gitHead must be generated from the checkout');
   assert.ok(!pkg.publishConfig, 'Review publishConfig before enabling this workflow');
 }
 

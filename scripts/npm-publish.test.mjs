@@ -28,6 +28,7 @@ test('exact tag, package and workflow identity reject arbitrary refs and shell i
   assert.equal(eventTag({ ...env, GITHUB_EVENT_NAME: 'push', GITHUB_REF: ref, GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/publish.yml@${ref}` }), 'v1.2.3');
   const pkg = { name: config.name, version: '1.2.3', repository: { url: `git+https://github.com/${repository}.git` } };
   checkPackage(pkg, 'v1.2.3');
+  assert.throws(() => checkPackage({ ...pkg, gitHead: commit }, 'v1.2.3'), /generated/);
   for (const change of [{ name: 'other' }, { version: '1.2.4' }, { repository: { url: 'wrong' } }, { private: true }, { publishConfig: { registry: 'other' } }]) assert.throws(() => checkPackage({ ...pkg, ...change }, 'v1.2.3'));
 });
 
