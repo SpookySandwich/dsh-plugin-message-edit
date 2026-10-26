@@ -1,0 +1,95 @@
+name: Publish npm
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (for example v1.4.1); never moved or created
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize all versions, including dispatch/tag races; never cancel a publish.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'SpookySandwich/dsh-plugin-message-edit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      commit: ${{ steps.resolve.outputs.commit }}
+    steps:
+      # Historical tags do not contain these helpers. Bootstrap from the exact
+      # revision of the executing workflow, separately from the release source.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: automation
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm install --global npm@12.2.1 --registry=https://registry.npmjs.org
+      - run: node --test automation/scripts/npm-publish.test.mjs
+      - id: resolve
+        working-directory: automation
+        run: node scripts/npm-publish.mjs resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.resolve.outputs.commit }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate, test and publish exact source with OIDC
+        working-directory: source
+        run: node ../automation/scripts/npm-publish.mjs publish
+        env:
+          RELEASE_TAG: ${{ steps.resolve.outputs.tag }}
+          RELEASE_COMMIT: ${{ steps.resolve.outputs.commit }}
+          GH_TOKEN: ${{ github.token }}
+
+  archive:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: automation
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.publish.outputs.commit }}
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Attach verified registry bytes to the existing release
+        working-directory: source
+        run: node ../automation/scripts/npm-publish.mjs archive
+        env:
+          RELEASE_TAG: ${{ needs.publish.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.publish.outputs.commit }}
+          GH_TOKEN: ${{ github.token }}

@@ -1,5 +1,10 @@
 # Release procedure
 
+For GitHub Actions OIDC publication and existing-tag backfills, follow
+[npm trusted publishing setup](NPM-PUBLISHING.md). That path requires an existing
+tag and public release before publication, and attaches the verified npm archive
+afterwards. The manual publication procedure below remains available.
+
 Publishing to npm and pushing code do not create a GitHub release. A release
 is complete only after its source, tag and downloadable archives agree.
 
