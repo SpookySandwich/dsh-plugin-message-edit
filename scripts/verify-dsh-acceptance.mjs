@@ -1,6 +1,8 @@
 // Run against test/fixtures/dsh-acceptance.mjs in a disposable local DSH home.
 import assert from 'node:assert/strict';
 const base = process.argv[2] ?? 'http://127.0.0.1:61587';
+const phase = process.argv[3];
+assert.ok(phase === undefined || phase === 'fresh' || phase === 'restart', 'Phase must be fresh or restart');
 const url = new URL(base);
 assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'Use a local acceptance server');
 async function state() {
@@ -23,6 +25,8 @@ const isUser = event => event.type === 'user/message' && event.data.source.kind 
 // not only read its log while creating another child from an unseeded root.
 const persistedBranch = before.sessions.find(session => session.header.isSeeded && !session.live
   && session.events.some(event => event.type === 'message-tree/version' && event.data.sessionId === session.header.id));
+if (phase === 'restart') assert.ok(persistedBranch, 'Restart must restore a previously persisted seeded branch');
+if (phase === 'fresh') assert.equal(persistedBranch, undefined, 'Fresh acceptance must start without old branches');
 if (persistedBranch) {
   const marker = persistedBranch.events.find(event => event.type === 'message-tree/version' && event.data.sessionId === persistedBranch.header.id);
   await post({ action: 'retry', sessionId: persistedBranch.header.id, turn: marker.data.effect.targetTurn });
