@@ -1,0 +1,198 @@
+﻿diff --git a/plugin.client.js b/plugin.client.js
+index 4b4b897..9377336 100644
+--- a/plugin.client.js
++++ b/plugin.client.js
+@@ -157,8 +157,7 @@ function sidebarRoot(id, byId) {
+ }
+
+ function sidebarList(list) {
+-  // Native subagent activity can use byId-only entries absent from list.ids.
+-  const byId = Object.fromEntries(Object.entries(list.byId).filter(([, row]) => row.origin === 'subagent'));
++  const byId = {};
+   const ids = [];
+   const seen = new Set();
+   for (const id of list.ids) {
+@@ -175,6 +174,11 @@ function sidebarList(list) {
+     row.running = row.running || session.running;
+     if (id !== root) row.retainedBy.mainView = (row.retainedBy.mainView || 0) + (session.retainedBy?.mainView || 0);
+   }
++  // Keep originals first for native main-view detection, then retain hidden
++  // search targets and byId-only subagents without adding visible rows.
++  for (const [id, row] of Object.entries(list.byId)) {
++    if (!byId[id]) byId[id] = row;
++  }
+   return { ...list, ids, byId };
+ }
+
+@@ -220,10 +224,10 @@ function sidebarSearch(result, list, query = '') {
+   }).map(sessionId => ({ sessionId })) : [];
+   const seen = new Set();
+   return { ...result, items: [...result.items, ...local].flatMap(item => {
+-    const sessionId = sidebarRoot(item.sessionId, list.byId);
+-    if (seen.has(sessionId)) return [];
+-    seen.add(sessionId);
+-    return [{ ...item, sessionId }];
++    const root = sidebarRoot(item.sessionId, list.byId);
++    if (seen.has(root)) return [];
++    seen.add(root);
++    return [item];
+   }) };
+ }
+
+@@ -236,6 +240,8 @@ function installSidebarGrouping(slots) {
+     function GroupedSidebar(props) {
+       const prefs = usePrefs();
+       const list = props.useSessions(state => state);
++      const latestList = React.useRef(list);
++      latestList.current = list;
+       const workspaces = props.useWorkspaces(state => state);
+       const statuses = props.useSessionStatus ? props.useSessionStatus(state => state) : null;
+       const grouped = React.useMemo(() => sidebarList(list), [list]);
+@@ -253,14 +259,16 @@ function installSidebarGrouping(slots) {
+         props.open(prefs.rememberPath && remembered && list.byId[remembered] && !workspaces.archivedSessionIds.includes(remembered) ? remembered : id);
+       };
+       const searchSessions = React.useCallback(async (...args) => {
+-        try { return sidebarSearch(await props.searchSessions(...args), list, args[0]); }
++        try { return sidebarSearch(await props.searchSessions(...args), latestList.current, args[0]); }
+         catch (error) {
+           if (args[1]?.aborted) throw error;
+-          const local = sidebarSearch({ items: [], hasMore: false }, list, args[0]);
++          const local = sidebarSearch({ items: [], hasMore: false }, latestList.current, args[0]);
+           if (!local.items.length) throw error;
+           return local;
+         }
+-      }, [props.searchSessions, list]);
++      // Native search clears its results whenever this callback changes.
++      // Catalog/status updates must not restart an otherwise unchanged query.
++      }, [props.searchSessions]);
+       return React.createElement(Original, prefs.foldSidebar ? { ...props, useSessions, useWorkspaces,
+         ...(props.useSessionStatus ? { useSessionStatus } : {}), open, searchSessions } : props);
+     }
+diff --git a/test/client-sidebar.test.mjs b/test/client-sidebar.test.mjs
+index e179073..7193b24 100644
+--- a/test/client-sidebar.test.mjs
++++ b/test/client-sidebar.test.mjs
+@@ -12,12 +12,25 @@ function setup(prefs = { foldSidebar: true, rememberPath: true }) {
+   const Original = props => props;
+   const entry = { component: Original, children: { native: {} }, store: {} };
+   let plugin;
++  const hooks = [];
++  let hookIndex = 0;
+   const React = {
+     createElement: (type, props) => ({ type, props }),
+     useReducer: () => [0, () => {}],
+     useEffect: fn => effects.push(fn),
+     useMemo: fn => fn(),
+-    useCallback: fn => fn,
++    useCallback(fn, deps) {
++      const index = hookIndex++;
++      const previous = hooks[index];
++      if (!previous || deps.some((value, i) => !Object.is(value, previous.deps[i]))) {
++        hooks[index] = { value: fn, deps };
++      }
++      return hooks[index].value;
++    },
++    useRef(value) {
++      const index = hookIndex++;
++      return hooks[index] ||= { current: value };
++    },
+   };
+   runInNewContext(bundle, {
+     window: {
+@@ -35,7 +48,7 @@ function setup(prefs = { foldSidebar: true, rememberPath: true }) {
+     effect: fn => fn(),
+   });
+   const row = (id, extra = {}) => ({ id, title: id, updatedAt: 1, running: false, retainedBy: {}, ...extra });
+-  const list = { phase: 'ready', ids: ['child', 'nested', 'root', 'other', 'orphan', 'subagent'], byId: {
++  let list = { phase: 'ready', ids: ['child', 'nested', 'root', 'other', 'orphan', 'subagent'], byId: {
+     root: row('root'), child: row('child', { parentId: 'root', updatedAt: 10, running: true, retainedBy: { mainView: 1 } }),
+     nested: row('nested', { parentId: 'child' }), other: row('other'),
+     orphan: row('orphan', { parentId: 'missing' }), subagent: row('subagent', { origin: 'subagent', parentId: 'root' }),
+@@ -52,11 +65,12 @@ function setup(prefs = { foldSidebar: true, rememberPath: true }) {
+     searchSessions: async () => ({ items: [{ sessionId: 'child', snippet: 'child match' }, { sessionId: 'nested' }, { sessionId: 'other' }], hasMore: false }),
+   };
+   function render() {
++    hookIndex = 0;
+     const result = entry.component(props);
+     while (effects.length) effects.shift()();
+     return result.props;
+   }
+-  return { entry, Original, props, list, workspace, statuses, opens, render, cleanups };
++  return { entry, Original, props, get list() { return list; }, set list(value) { list = value; }, workspace, statuses, opens, render, cleanups };
+ }
+
+ test('folding is opt-in and preserves the original native sidebar props when disabled', () => {
+@@ -73,6 +87,7 @@ test('folding projects nested versions into one row without mutating the real ca
+   assert.equal(list.byId.root.running, true);
+   assert.equal(list.byId.root.updatedAt, 10);
+   assert.equal(list.byId.root.retainedBy.mainView, 1);
++  assert.equal(Object.values(list.byId).find(row => row.retainedBy.mainView > 0).id, 'root');
+   assert.equal(h.list.byId.root.running, false);
+   assert.equal(h.list.byId.root.retainedBy.mainView, undefined);
+   assert.equal(props.renderSlot, h.props.renderSlot);
+@@ -96,7 +111,7 @@ test('opening the root honors rememberPath and skips archived remembered version
+
+ test('native search results are deduplicated without discarding snippets or paging metadata', async () => {
+   const result = await setup().render().searchSessions('query');
+-  assert.deepEqual(Array.from(result.items, item => item.sessionId), ['root', 'other']);
++  assert.deepEqual(Array.from(result.items, item => item.sessionId), ['child', 'other']);
+   assert.equal(result.items[0].snippet, 'child match');
+   assert.equal(result.hasMore, false);
+ });
+@@ -162,7 +177,7 @@ test('searching a renamed branch or its id still finds the family when host cont
+   h.props.searchSessions = async () => { throw new Error('content search disabled'); };
+   for (const query of ['special branch', 'child']) {
+     const result = await h.render().searchSessions(query);
+-    assert.deepEqual(Array.from(result.items, row => row.sessionId), ['root']);
++    assert.deepEqual(Array.from(result.items, row => row.sessionId), ['child']);
+   }
+   await assert.rejects(h.render().searchSessions('no matching branch'), /content search disabled/);
+ });
+@@ -171,7 +186,7 @@ test('bounded native search preserves its refine hint and cancellation', async (
+   const h = setup();
+   h.props.searchSessions = async () => ({ items: [{ sessionId: 'child', snippet: 'first' }, { sessionId: 'nested', snippet: 'second' }], hasMore: true });
+   const result = await h.render().searchSessions('child');
+-  assert.deepEqual(Array.from(result.items, row => row.sessionId), ['root']);
++  assert.deepEqual(Array.from(result.items, row => row.sessionId), ['child']);
+   assert.equal(result.items[0].snippet, 'first');
+   assert.equal(result.hasMore, true);
+   h.props.searchSessions = async () => { throw new Error('aborted'); };
+@@ -185,3 +200,38 @@ test('equal titles without recorded parentage never merge independent originals'
+   assert.ok(ids.includes('root'));
+   assert.ok(ids.includes('other'));
+ });
++
++test('catalog and status updates keep the search callback stable while new queries see fresh hidden versions', async () => {
++  const h = setup();
++  h.props.searchSessions = async () => ({ items: [], hasMore: false });
++  const search = h.render().searchSessions;
++  h.list = { ...h.list, ids: [...h.list.ids, 'new-child'], byId: { ...h.list.byId,
++    'new-child': { ...h.list.byId.child, id: 'new-child', title: 'Fresh hidden title', parentId: 'root' },
++    child: { ...h.list.byId.child, running: false },
++  } };
++  h.statuses.set('child', { running: false, completionUnread: true });
++  assert.equal(h.render().searchSessions, search, 'native search effect must not restart for background catalog activity');
++  assert.deepEqual(Array.from((await search('Fresh hidden')).items, row => row.sessionId), ['new-child']);
++  h.props.searchSessions = async () => { throw new Error('index disabled'); };
++  const fallback = h.render().searchSessions;
++  assert.notEqual(fallback, search, 'a changed host search provider must be used');
++  assert.deepEqual(Array.from((await fallback('Fresh hidden')).items, row => row.sessionId), ['new-child']);
++});
++
++test('a hidden content hit opens its matching version regardless of remembered sibling or rememberPath setting', async () => {
++  for (const rememberPath of [true, false]) {
++    const h = setup({ foldSidebar: true, rememberPath });
++    h.list.byId.child.retainedBy = {};
++    h.list.byId.nested.retainedBy = { mainView: 1 };
++    h.workspace.archivedSessionIds = [];
++    const props = h.render();
++    const result = await props.searchSessions('only child content');
++    const match = result.items[0];
++    assert.equal(match.sessionId, 'child');
++    assert.equal(props.useSessions(state => state.byId[match.sessionId]), h.list.byId.child,
++      'native search must be able to resolve the hidden version');
++    props.open(match.sessionId);
++    props.open('root');
++    assert.deepEqual(h.opens, ['child', rememberPath ? 'nested' : 'root']);
++  }
++});

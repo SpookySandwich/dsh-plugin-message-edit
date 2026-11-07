@@ -1,0 +1,38 @@
+{
+  "source": "88ba4a146445a2293184d9067645a76b908b10bc",
+  "browser": "156.0.4314.58",
+  "checks": [
+    {
+      "name": "completion leads to source and native read clears it: native control",
+      "label": "native control",
+      "opened": "session-2e1ad6ba-e568-411a-bf56-1a4c22cf8c09",
+      "childStatus": {
+        "running": false,
+        "completionUnread": false
+      },
+      "rowCompleted": 0,
+      "after": {
+        "running": false,
+        "completionUnread": false
+      }
+    }
+  ],
+  "errors": [],
+  "httpErrors": [],
+  "family": {
+    "root": "session-qa-live",
+    "child": "session-2e1ad6ba-e568-411a-bf56-1a4c22cf8c09",
+    "sibling": "session-7d9ec79b-4541-46e3-95fd-9a244b7405ef",
+    "other": "session-qa-cold"
+  },
+  "lastObservation": {
+    "label": "remember OFF",
+    "opened": "session-qa-live",
+    "childStatus": {
+      "running": false,
+      "completionUnread": true
+    },
+    "rowCompleted": 1
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Completed family row must open the unread child\n+ actual - expected\n\n+ 'session-qa-live'\n- 'session-2e1ad6ba-e568-411a-bf56-1a4c22cf8c09'\n           ^\n\n    at file:///<task-root>/repo/scripts/verify-dsh-status.mjs:76:12"
+}

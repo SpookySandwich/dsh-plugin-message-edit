@@ -1,0 +1,149 @@
+{
+  "source": "586e7e7206c42ab6d71953d80ac2025ae024a33c",
+  "checks": [
+    {
+      "name": "restart restores durable family and grouping preference; cold root not live"
+    },
+    {
+      "name": "settled Versions layout has no overlapping cards",
+      "cardCount": 7
+    },
+    {
+      "name": "normal cold-root UI edit groups without catalog loss",
+      "coldChild": "session-6c107ea3-5dff-44f2-98a3-13a8a4a2065d"
+    },
+    {
+      "name": "UI nested edit after restart retains turn-two lineage",
+      "nested": "session-1b8f2c68-969c-4005-aeba-a4768043ff8d"
+    },
+    {
+      "name": "Versions card navigation selects original"
+    },
+    {
+      "name": "Claude UI retry creates grouped persisted sibling",
+      "retry": "session-673f94f2-8b1c-498a-843f-4fe25fd624d9"
+    },
+    {
+      "name": "child pin leaves root menu unpinned; native root pin and unpin agree"
+    },
+    {
+      "name": "known archived-only hit caveat observed: live root styling, notification, no navigation",
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceChildOnlyZephyr Live edited prompt; keep both images."
+      ]
+    },
+    {
+      "name": "Archived only respects live-root visibility"
+    },
+    {
+      "name": "archived root shows its own content in Archived only",
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceOriginal first turn; keep both images."
+      ]
+    },
+    {
+      "name": "real host cross-workspace lineage keeps root once; orphan and equal-title independent root visible",
+      "workspaceId": "fb9214b0-7f3d-446c-813b-cd0030d93b41"
+    },
+    {
+      "name": "detached root stays visible once despite children in registered workspaces"
+    },
+    {
+      "name": "real spawned subagent under hidden version contributes running count without ordinary row",
+      "childId": "4b49d2f8-0420-41aa-a5f4-fd1ed9444d67"
+    },
+    {
+      "name": "local subagent completes",
+      "subStatus": [
+        {
+          "childId": "4b49d2f8-0420-41aa-a5f4-fd1ed9444d67",
+          "settled": true,
+          "result": {
+            "output": [
+              {
+                "type": "text",
+                "text": "chunk0 chunk1 chunk2 chunk3 chunk4 chunk5 chunk6 chunk7 chunk8 chunk9 chunk10 chunk11 chunk12 chunk13 chunk14 chunk15 chunk16 chunk17 chunk18 chunk19 chunk20 chunk21 chunk22 chunk23 chunk24 chunk25 chunk26 chunk27 chunk28 chunk29 chunk30 chunk31 chunk32 chunk33 chunk34 chunk35 chunk36 chunk37 chunk38 chunk39 chunk40 chunk41 chunk42 chunk43 chunk44 chunk45 chunk46 chunk47 chunk48 chunk49 chunk50 chunk51 chunk52 chunk53 chunk54 chunk55 chunk56 chunk57 chunk58 chunk59 Local QA reply. Received 0 images."
+              }
+            ],
+            "stopReason": "completed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "native independent copy remains its own sidebar root",
+      "copy": "session-39f6aa73-2a84-46bd-8837-e54659ed1948"
+    },
+    {
+      "name": "400px More-menu Versions navigation and settled layout"
+    },
+    {
+      "name": "400px en settings controls fit",
+      "controls": [
+        {
+          "x": 284,
+          "right": 384
+        },
+        {
+          "x": 368,
+          "right": 381
+        },
+        {
+          "x": 368,
+          "right": 381
+        },
+        {
+          "x": 368,
+          "right": 381
+        }
+      ]
+    },
+    {
+      "name": "400px zh settings controls fit",
+      "controls": [
+        {
+          "x": 284,
+          "right": 384
+        },
+        {
+          "x": 368,
+          "right": 381
+        },
+        {
+          "x": 368,
+          "right": 381
+        },
+        {
+          "x": 368,
+          "right": 381
+        }
+      ]
+    },
+    {
+      "name": "400px ru settings controls fit",
+      "controls": [
+        {
+          "x": 284,
+          "right": 384
+        },
+        {
+          "x": 368,
+          "right": 381
+        },
+        {
+          "x": 368,
+          "right": 381
+        },
+        {
+          "x": 368,
+          "right": 381
+        }
+      ]
+    },
+    {
+      "name": "no page exceptions or HTTP errors"
+    }
+  ],
+  "errors": [],
+  "httpErrors": []
+}

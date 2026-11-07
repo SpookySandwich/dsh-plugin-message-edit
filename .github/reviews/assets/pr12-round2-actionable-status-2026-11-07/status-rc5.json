@@ -1,0 +1,110 @@
+{
+  "source": "586e7e7206c42ab6d71953d80ac2025ae024a33c",
+  "browser": "156.0.4314.58",
+  "checks": [
+    {
+      "name": "completion leads to source and native read clears it: native control",
+      "label": "native control",
+      "opened": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+      "childStatus": {
+        "running": false,
+        "completionUnread": false
+      },
+      "rowCompleted": 0,
+      "after": {
+        "running": false,
+        "completionUnread": false
+      }
+    },
+    {
+      "name": "completion leads to source and native read clears it: remember OFF",
+      "label": "remember OFF",
+      "opened": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+      "childStatus": {
+        "running": false,
+        "completionUnread": false
+      },
+      "rowCompleted": 0,
+      "after": {
+        "running": false,
+        "completionUnread": false
+      }
+    },
+    {
+      "name": "completion leads to source and native read clears it: remember ON",
+      "label": "remember ON",
+      "opened": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+      "childStatus": {
+        "running": false,
+        "completionUnread": false
+      },
+      "rowCompleted": 0,
+      "after": {
+        "running": false,
+        "completionUnread": false
+      }
+    },
+    {
+      "name": "multiple completions are visited individually remember=false",
+      "first": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+      "remaining": "session-ca8cb7bc-f0cc-4953-b351-7cd009d20ad1"
+    },
+    {
+      "name": "no actionable status restores ordinary remember=false"
+    },
+    {
+      "name": "multiple completions are visited individually remember=true",
+      "first": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+      "remaining": "session-ca8cb7bc-f0cc-4953-b351-7cd009d20ad1"
+    },
+    {
+      "name": "no actionable status restores ordinary remember=true"
+    },
+    {
+      "name": "explicit root-content hit precedes hidden pending approval remember=false"
+    },
+    {
+      "name": "real pending approval opens before unread sibling and native rejection settles it remember=false",
+      "record": {
+        "sessionId": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+        "settled": true,
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "explicit root-content hit precedes hidden pending approval remember=true"
+    },
+    {
+      "name": "real pending approval opens before unread sibling and native rejection settles it remember=true",
+      "record": {
+        "sessionId": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+        "settled": true,
+        "outcome": "rejected"
+      }
+    },
+    {
+      "name": "root approval remains on the root with a remembered sibling"
+    },
+    {
+      "name": "no page exceptions or HTTP errors"
+    }
+  ],
+  "errors": [],
+  "httpErrors": [],
+  "host": "0.2.1-rc.5",
+  "family": {
+    "root": "session-qa-live",
+    "child": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+    "sibling": "session-ca8cb7bc-f0cc-4953-b351-7cd009d20ad1",
+    "other": "session-qa-cold"
+  },
+  "lastObservation": {
+    "label": "remember ON",
+    "opened": "session-2efa4e84-2419-4122-ab26-9be592dd6c4c",
+    "childStatus": {
+      "running": false,
+      "completionUnread": false
+    },
+    "rowCompleted": 0
+  }
+}

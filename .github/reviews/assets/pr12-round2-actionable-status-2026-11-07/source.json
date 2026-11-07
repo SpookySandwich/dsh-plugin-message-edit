@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "586e7e7206c42ab6d71953d80ac2025ae024a33c",
+  "baseline": "88ba4a146445a2293184d9067645a76b908b10bc",
+  "gitBlobs": [
+    "100644 blob 8af910b0847102a82b1153325791c27d4c3d14ae\tplugin.client.js",
+    "100644 blob 9f8cfcc2994a5b6d211be3fd15f9b8be8d1e595e\tscripts/verify-dsh-browser.mjs",
+    "100644 blob 75d302fec01fd240b0574949a100db4958b808f7\tscripts/verify-dsh-status.mjs",
+    "100644 blob afe9709deada252d044a12baae3b8e1a2987f7e2\ttest/client-sidebar.test.mjs",
+    "100644 blob 3cdca8a75ec751011149fa9e04bf3267ebde043c\ttest/fixtures/dsh-acceptance.mjs",
+    "100644 blob 0cb846a85897ad86b8a4c77eca81b728a71b8eff\ttest/fixtures/dsh-browser-acceptance.mjs"
+  ],
+  "note": "The older main matrix ran before the source commit on these identical implementation bytes. The status matrices and latest main/restart/FTS-off matrices ran with this source commit recorded. The following commit adds only evidence."
+}

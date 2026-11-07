@@ -1,0 +1,324 @@
+Sanitized command output, 2026-11-07. Host authentication logs excluded.
+
+--- npm-ci.log ---
+npm.cmd : npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException instead
+At line:1 char:482
++ ... = $env:TEMP; npm.cmd ci --no-audit --no-fund *> ../npm-ci.log; if ($L ...
++                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn deprec...ception instead:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+added 577 packages in 35s
+npm warn install-scripts 5 packages have install scripts not yet covered by allowScripts:
+npm warn install-scripts   @deepseek-ai/dsh-subprocess-local@0.2.0-rc.2 (postinstall: node 
+scripts/ensure-spawn-helper.mjs)
+npm warn install-scripts   @google/genai@2.21.0 (preinstall: echo 'preinstall: no-op')
+npm warn install-scripts   koffi@3.1.1 (install: node ./cnoke.cjs -P . -D src/koffi --prebuild --release)
+npm warn install-scripts   node-pty@1.2.0-beta.15 (install: node scripts/prebuild.js || node-gyp rebuild; postinstall: 
+node scripts/post-install.js)
+npm warn install-scripts   protobufjs@7.6.6 (postinstall: node scripts/postinstall)
+npm warn install-scripts
+npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+
+--- tests.log ---
+
+> dsh-plugin-message-edit@1.5.0 pretest
+> npm run build
+
+
+> dsh-plugin-message-edit@1.5.0 build
+> node scripts/build-client.mjs
+
+npm.cmd : wrote lib/client.js (93081 bytes)
+At line:1 char:605
++ ... ./npm-ci.log -Tail 40; exit 1 }; npm.cmd test *> ../tests.log; if ($L ...
++                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (wrote lib/client.js (93081 bytes):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+> dsh-plugin-message-edit@1.5.0 test
+> node scripts/build-client.mjs --check && node --test test/*.test.mjs
+
+lib/client.js is up to date
+鉁?text and multiple images render through the host gallery in attachment order (407.2375ms)
+鉁?reopening an original never unarchives its remembered child implicitly (50.2404ms)
+鉁?native Quote and context-menu selection source is the message text, not its controls (46.2081ms)
+鉁?an image-only message still displays its image (31.3841ms)
+鉁?DSH async image loader displays attachments without the retired gallery callback (29.4221ms)
+鉁?missing/non-function host renderer falls back safely (undefined) (22.8431ms)
+鉁?missing/non-function host renderer falls back safely (null) (18.8321ms)
+鉁?missing/non-function host renderer falls back safely (unavailable) (26.5989ms)
+鉁?text-only messages do not invoke the gallery or display an image notice (27.659ms)
+鉁?an image block without an attachment reports unavailable (25.4245ms)
+鉁?native content factory receives ordered image blocks and a working fallback without child declarations (27.8896ms)
+鉁?legacy gallery takes precedence over the factory and loader (20.5922ms)
+鉁?native factory content sits above the text bubble in the full message row (25.8107ms)
+鉁?cached URLs render without loading and thumbnail opens the original safely (18.6604ms)
+鉁?sync loader and throwing peek are supported (21.5208ms)
+鉁?Russian fallback images show loading, open and unavailable messages through the official locale (36.5432ms)
+鉁?Russian native-factory fallback and edit/cancel preserve images and translated retention notice (26.7136ms)
+鉁?Russian image retention fallback works when no image renderer is supplied (19.7034ms)
+鉁?pending loads never become src values; rebind ignores stale resolutions and clears a previous URL (27.9819ms)
+鉁?session rebind remounts even with the same attachment and loader (30.0131ms)
+鉁?loader reject leaves a readable unavailable notice (30.3677ms)
+鉁?loader throw leaves a readable unavailable notice (26.3712ms)
+鉁?loader empty leaves a readable unavailable notice (28.0761ms)
+鉁?loader object leaves a readable unavailable notice (20.0317ms)
+鉁?image decode failure removes the broken thumbnail (25.2406ms)
+鉁?missing attachments do not hide good images in the same message (36.1813ms)
+鉁?settling a load after unmount is harmless (21.7936ms)
+鉁?editing cancels an outstanding load and cancelling reloads images (29.6111ms)
+鉁?editing keeps the attachment notice and cancelling restores the host gallery (21.3902ms)
+鉁?version navigation opens the selected sibling (22.6753ms)
+鉁?all 39 locale keys and placeholder multisets match the English dictionary (7.8247ms)
+鉁?official locale catalog selects Russian for ru-RU and translates every key with parameters (1.7326ms)
+鉁?an existing Russian language pack keeps its catalog entry on plugin disposal (1.014ms)
+鉁?dictionary-only locale services keep working without the catalog extension (0.8991ms)
+鉁?declared client dependencies make the UI services available for registration (6.4982ms)
+鉁?a missing slots service fails visibly instead of silently disabling the module (1.0267ms)
+鉁?a missing workspace navigation owner fails visibly (2.0849ms)
+鉁?Cordis waits for both session data and workspace navigation before applying the client (10.1016ms)
+鉁?a user-renderer collision is reported while the other UI entries still register (0.942ms)
+鉁?folding is opt-in and preserves the original native sidebar props when disabled (6.7031ms)
+鉁?folding projects nested versions into one row without mutating the real catalog (2.5429ms)
+鉁?opening the root honors rememberPath and skips archived remembered versions (3.253ms)
+鉁?native search results are deduplicated without discarding snippets or paging metadata (2.3804ms)
+鉁?one family search row opens the version supplying its snippet with rememberPath on or off (3.6992ms)
+鉁?cleared search cannot redirect ordinary sidebar navigation (1.7426ms)
+鉁?out-of-order search completion cannot overwrite the current click target (1.1872ms)
+鉁?search targets are consumed on click and never implicitly open archived versions (1.0461ms)
+鉁?grouping off keeps each native search target and ordinary navigation intact (1.4109ms)
+鉁?hidden title fallback navigates to the matching version even without content search (1.0516ms)
+鉁?unloading restores the native component and leaves its declarations/store intact (0.7161ms)
+鉁?a cyclic or missing lineage never hangs and keeps visible rows (0.729ms)
+鉁?a family in multiple workspaces appears only in the original conversation workspace (0.6781ms)
+鉁?a child pin does not make the root appear pinned while its native action still says Pin (0.6486ms)
+鉁?arrival of a missing original groups existing descendants without a reload (0.8689ms)
+鉁?native status snapshots do not override aggregated child activity with an idle root (0.8839ms)
+鉁?subagents outside catalog ids remain available to native child activity projection (0.8343ms)
+鉁?grouped rows count running subagents owned by hidden versions without double-counting inherited catalogs (1.0893ms)
+鉁?searching a renamed branch or its id still finds the family when host content search is disabled (1.3889ms)
+鉁?bounded native search preserves its refine hint and cancellation (1.0575ms)
+鉁?equal titles without recorded parentage never merge independent originals (0.768ms)
+鉁?catalog and status updates keep the search callback stable while new queries see fresh hidden versions (1.045ms)
+鉁?default FTS-off shared-title search preserves ordinary navigation and the remembered path (1.5906ms)
+鉁?workspace and root-ID matches with empty or pending search retain ordinary remember behavior (6.5457ms)
+鉁?shared-title hits without displayed content keep ordinary navigation (7.473ms)
+鉁?a displayed root-content snippet opens the original instead of its remembered edited version (3.6503ms)
+鉁?the first displayed nonempty snippet outranks earlier hits without content and selects its root or hidden version (7.8711ms)
+鉁?root workspace label and cwd matches outrank a hidden title without a content snippet (3.1974ms)
+鉁?default archive filter drops archived snippets before choosing an openable matching version (1.224ms)
+鉁?archived shared-title children cannot block the matching root or live title sibling with FTS off (4.1705ms)
+鉁?an archived-only match is hidden by default and not redirected to an unrelated root when shown (1.017ms)
+鉁?show-archived prefers a matching live root or sibling over an archived hit (1.4598ms)
+鉁?root-owned archive visibility also governs grouped search in default, show and only modes (0.9532ms)
+鉁?archive membership and visibility refresh search, while unchanged archive state keeps the callback stable (3.1588ms)
+鉁?pending search uses the current archive membership when results arrive (0.9876ms)
+鉁?cancelled search leaves a remembered sibling intact and grouping off delegates archive policy unchanged (1.4802ms)
+鉁?package declarations admit tested prereleases under default npm semver rules (3.7527ms)
+鉁?legacy live: edit preserves images and rewinds history (12.154ms)
+鉁?legacy resumed: edit preserves images and rewinds history (2.0107ms)
+鉁?legacy: nested and repeated edits preserve the correct fork anchor (2.3535ms)
+鉁?modern live: edit preserves images and rewinds history (0.9599ms)
+鉁?modern resumed: edit preserves images and rewinds history (0.885ms)
+鉁?modern: nested and repeated edits preserve the correct fork anchor (1.3737ms)
+鉁?tree cache sees new live events without re-snapshotting an unchanged log (0.4712ms)
+鉁?tree cache refreshes cold logs even though the creation timestamp is unchanged (0.4434ms)
+鉁?unreadable live history returns an actionable error without creating a branch (1.012ms)
+鉁?invalid edit targets are rejected without creating a branch (0.5528ms)
+鉁?activate unarchives through workspaceRegistry.unarchiveSession (0.675ms)
+鉁?real DSH 0.2.0-rc.2 constructor accepts a branch and setup clears rewound input before publication (9.0108ms)
+鉁?live snapshot API takes precedence over a retired events getter (1.217ms)
+鉁?cache counts do not materialize a modern live log (0.2112ms)
+鉁?modern readSession snapshots carry their header in session (0.1163ms)
+鉁?missing or malformed histories fail visibly instead of becoming empty logs (0.5292ms)
+鉁?seeded modern records require a valid inherited cut (0.1872ms)
+鉁?cold seeded histories use the restored observation API and release the lease (0.3126ms)
+PASS  first edit of turn 1 hangs off A
+PASS  second edit of turn 1 hangs off A, not B
+PASS  third edit of turn 1 hangs off A, not C
+PASS  edit of a later turn hangs off the current session
+PASS  chained third edit is 3/3, not 2/2
+PASS  sibling edits of turn 1 are 4/4
+PASS  a later-turn edit rings against its own parent, not turn 1
+PASS  turn 1 ring while viewing a turn-2 child still sees A/B
+PASS  root of the root is itself
+PASS  root of a direct branch is the root
+PASS  root of a nested branch is still the root
+PASS  every branch agrees on one key
+PASS  unknown session has no root
+PASS  missing versions has no root
+PASS  a parent cycle terminates instead of hanging
+PASS  a dangling parent stops at the visible node
+PASS  deleting a sibling renumbers the ring instead of breaking it
+PASS  deleting the fork original degrades to no ring, not a crash
+PASS  a hole in the parent chain yields no ring, not a crash
+PASS  rootOf stops at the hole instead of crashing
+PASS  ancestor chain recovered from one log, nearest first
+PASS  a same-turn sibling sees only the fork original
+PASS  a root session has no chain
+PASS  a deleted chain link keeps the family one tree
+PASS  a deleted original is synthesized as the ghost root
+PASS  ghost original anchors the fork without being a page
+PASS  a ghost chain link still connects survivors into one ring
+PASS  turn tree has 5 nodes (root + 2 children + 2 leaves)
+PASS  root node exists and is origin
+PASS  turn 1 of A and turn 1 of B both hang off root
+PASS  turn 2 of A hangs off A#t1, turn 2 of B hangs off B#t1
+PASS  active path highlights B branch when viewing B
+PASS  turn 2 of C branches off A#t1
+PASS  turn 3 of C hangs off C#t2
+PASS  turn 2 of A hangs off A#t1
+PASS  empty versions produces empty tree
+
+all passed
+鉁?test\tree.test.mjs (142.8009ms)
+鈩?tests 95
+鈩?suites 0
+鈩?pass 95
+鈩?fail 0
+鈩?cancelled 0
+鈩?skipped 0
+鈩?todo 0
+鈩?duration_ms 4428.6863
+
+--- dependencies.log ---
+dsh-plugin-message-edit@1.5.0 <task-root>\repo
++-- @deepseek-ai/cordis@4.0.4
++-- @deepseek-ai/dsh-client-locale@0.2.0-rc.2
++-- @deepseek-ai/dsh-scope@0.2.0-rc.2
++-- @deepseek-ai/dsh-session@0.2.0-rc.2
++-- @deepseek-ai/dsh@0.2.0-rc.2
++-- jsdom@29.1.1
++-- react-dom@19.2.8
++-- react@19.2.8
+`-- semver@7.8.5
+
+
+--- acceptance-022.log ---
+Official DSH 0.2.2-rc.1 acceptance: fresh; pid=53000; home=<task-root>\message-edit-dsh-qa-Vx5ZhJ; origin=<local-host>
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-899148c8-72eb-4b50-841d-3da2d509536b","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-6f5faf61-9ba1-4579-a6b3-133ebc4843dc","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+Official DSH 0.2.2-rc.1 acceptance: restart; pid=110744; home=<task-root>\message-edit-dsh-qa-Vx5ZhJ; origin=<local-host>
+Persisted seeded branch resumed and retried successfully.
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-45a48cc2-72b6-4fe4-96ab-650044ab3afe","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-d03b74e5-267e-4f82-b94a-29af62bc26ee","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+
+--- acceptance-022-final.log ---
+Official DSH 0.2.2-rc.1 acceptance: fresh; pid=35356; home=<task-root>\message-edit-dsh-qa-7dvh0g; origin=<local-host>
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-52af7f7c-9b78-4eb8-9812-f81bb9cbe694","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-5ef8b072-aceb-4612-b3d7-6cc4a27b3ab2","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+Official DSH 0.2.2-rc.1 acceptance: restart; pid=51612; home=<task-root>\message-edit-dsh-qa-7dvh0g; origin=<local-host>
+Persisted seeded branch resumed and retried successfully.
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-a1309fde-d922-4a10-864e-de4004193bc4","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-c354e6c7-7c1e-4964-a8bb-24f44026705d","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+
+--- acceptance-020.log ---
+Official DSH 0.2.0-rc.2 acceptance: fresh; pid=59140; home=<task-root>\message-edit-dsh-qa-bWm2wj; origin=<local-host>
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-107e7373-b7eb-4422-b174-e0aea23bd474","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-6429417e-e912-455b-9cc9-e72cfa6af70d","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+Official DSH 0.2.0-rc.2 acceptance: restart; pid=57164; home=<task-root>\message-edit-dsh-qa-bWm2wj; origin=<local-host>
+Persisted seeded branch resumed and retried successfully.
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-5dbbc6d7-ebe5-4195-8509-4dbe1da531ac","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-175ea4db-0eac-4c29-9bfb-cd24666fa0e6","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+
+--- acceptance-rc5.log ---
+Official DSH 0.2.1-rc.5 acceptance: fresh; pid=15768; home=<task-root>\message-edit-dsh-qa-c8HvXq; origin=<local-host>
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-11d149c3-0f34-4006-b0e8-7f0eb0030b1f","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-c0d41c35-883f-4bee-8bd9-74658aeda2a2","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+Official DSH 0.2.1-rc.5 acceptance: restart; pid=119540; home=<task-root>\message-edit-dsh-qa-c8HvXq; origin=<local-host>
+Persisted seeded branch resumed and retried successfully.
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-eb328b13-5aa0-4f25-b1b6-72826f9af7c7","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-1ab4b8d4-054b-42db-8edc-d69557087094","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+
+--- acceptance-rc2.log ---
+Official DSH 0.2.1-rc.2 acceptance: fresh; pid=79196; home=<task-root>\message-edit-dsh-qa-3jrvrL; origin=<local-host>
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-4729349c-c278-4927-9a48-76c2ea60d529","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-1a4c633a-1287-48cd-8c9c-ba90ddada361","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+Official DSH 0.2.1-rc.2 acceptance: restart; pid=73836; home=<task-root>\message-edit-dsh-qa-3jrvrL; origin=<local-host>
+Persisted seeded branch resumed and retried successfully.
+{"source":"session-qa-live","sourceWasLive":true,"child":"session-1a788fb0-9d28-4352-9461-d66bdd21f035","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+{"source":"session-qa-cold","sourceWasLive":false,"child":"session-efc021c7-3808-4b1c-b739-972bcbdb4157","result":"edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed"}
+
+--- package.log ---
+
+> dsh-plugin-message-edit@1.5.0 check:package
+> node scripts/check-package.mjs
+
+Package verified: dsh-plugin-message-edit-1.5.0.tgz; 13 files; all runtime entries present.
+
+--- release-tools.log ---
+
+> dsh-plugin-message-edit@1.5.0 check:release-tools
+> node --test scripts/release-tools.test.mjs
+
+warning: in the working copy of 'source.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'source.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'source.txt', LF will be replaced by CRLF the next time Git touches it
+鉁?ordinary npm source needs no recovery record (0.7327ms)
+鉁?only the reproduced 1.2.1 artifact can recover missing npm gitHead (2.3348ms)
+鉁?both downloads must match the recorded bytes, not only registry metadata (0.5062ms)
+鉁?publish guard accepts a clean normal clone and rejects dirty or linked worktrees (2816.6358ms)
+鈩?tests 4
+鈩?suites 0
+鈩?pass 4
+鈩?fail 0
+鈩?cancelled 0
+鈩?skipped 0
+鈩?todo 0
+鈩?duration_ms 2980.4799
+
+--- publish-tools.log ---
+鉁?exact tag, package and workflow identity reject arbitrary refs and shell input (2.5793ms)
+鉁?registry preflight fails closed and refuses source collisions (19.1336ms)
+鉁?archive retry verifies bytes and never overwrites a collision (0.8347ms)
+鉁?npm publication inherits the actual GitHub environment without source overrides (0.5087ms)
+鉁?dispatch provenance follows original workflow context while release gitHead remains independent (2.4076ms)
+鉁?tag-push provenance must match the release commit as well as the original run (0.4059ms)
+鉁?uncached preflight and bounded polling tolerate delayed version and attestation visibility (0.83ms)
+鉁?fresh, existing-version retry and archive all require provenance; errors cannot become absence (1.999ms)
+鉁?release visibility wait is bounded and surfaces errors without retrying mutations (0.2649ms)
+鉁?real Git fixture resolves old and annotated tags, rejects unreachable tags and dirty/worktree source (2682.4944ms)
+鈩?tests 10
+鈩?suites 0
+鈩?pass 10
+鈩?fail 0
+鈩?cancelled 0
+鈩?skipped 0
+鈩?todo 0
+鈩?duration_ms 2872.2853
+
+--- matrix-current.log ---
+PASS official full-text search enabled
+PASS grouping defaults OFF
+PASS UI edit with two images immediately groups and selects original
+PASS second UI edit preserves family
+PASS root-content opens root remember=false
+PASS child-content opens child remember=false
+PASS local root title plus child content deduplicates remember=false
+PASS root ID title-only ordinary navigation remember=false
+PASS root-content opens root remember=true
+PASS child-content opens child remember=true
+PASS local root title plus child content deduplicates remember=true
+PASS root ID title-only ordinary navigation remember=true
+PASS grouping OFF preserves direct content navigation
+PASS hidden unique title opens its version
+PASS archived remembered child stays archived and default search hides it
+PASS no search flicker grouping=false
+PASS no search flicker grouping=true
+PASS Versions tree renders grouped family
+PASS no page exceptions or HTTP errors
+
+--- matrix-fts-off-final.log ---
+PASS official default content search is disabled
+PASS second restart restores nested edits and retry version markers
+PASS shared-title FTS-off navigation remember=false
+PASS shared-title FTS-off navigation remember=true
+PASS unique hidden-title fallback opens child without full-text search
+PASS ambiguous hidden-title behavior observed
+PASS ambiguous hidden-title behavior observed
+PASS grouping OFF default host has no content-only search results
+PASS real plugin disposal restores native sidebar registration
+PASS no page exceptions or HTTP errors

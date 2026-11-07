@@ -51,27 +51,34 @@ npm test
 ```
 Automatically builds the client first, checks that it matches the source, then
 runs the Node test runner. Install development dependencies with `npm ci` on a
-fresh checkout before running tests (Node 22.19+ or Node 24).
+fresh checkout before running tests (Node 22.19+ or Node 24; official DSH `0.2.2-rc.1` host acceptance requires Node `>=24.9.0`).
 
 - `test/tree.test.mjs`: 36 assertions covering branch and version-tree behavior.
 - `test/client-images.test.mjs`: loads the generated client through its module
   loader, mounts its registered user-message component using React and jsdom,
   and checks image delegation, multiple/image-only messages, old-host fallback,
-  text-only messages, and entering/cancelling an edit. Host services and the image
-  gallery are test doubles; these are not full DSH integration tests.
+  text-only messages, Quote text-interaction source marking, and entering/cancelling
+  an edit. Host services and the image gallery are test doubles; these are not
+  full DSH integration tests.
 - `test/client-locale.test.mjs`: exercises the generated client against the
   published `@deepseek-ai/dsh-client-locale` runtime (`test/fixtures/locale-runtime.mjs`),
-  checking 37-key parity, placeholder parity, Russian lookup and interpolation,
+  checking 39-key parity, placeholder parity, Russian lookup and interpolation,
   language-catalog registration (`Русский`), `ru-RU` browser detection,
   English fallback, preloaded language-pack respect, and disposal cleanup.
 - `test/client-registration.test.mjs`: checks module dependencies and visible
   failures when services or registrations are unavailable.
+- `test/client-sidebar.test.mjs`: checks opt-in sidebar grouping, nested/orphan
+  lineage, immutable catalog projections, selected/running and subagent activity
+  state, actionable status priority (`approval`/`plan-review`/`question` and
+  unread completion), remembered version navigation, archive-filter search
+  deduplication and target routing, and restoration on plugin unload.
 - `test/session-record.test.mjs` and `test/host-compatibility.test.mjs`: cover
   legacy/current session shapes, live/resumed edit requests, retained images,
   retry ancestry, nested version markers, and cache invalidation.
 
 GitHub Actions runs these checks for pull requests and branch pushes, on
-Linux (Node 22 and 24) and Windows (Node 22). It also runs:
+Linux (Node 22 and 24) and Windows (Node 22), plus official DSH host acceptance
+(`0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, and `0.2.2-rc.1` on Linux and Windows with Node 24). It also runs:
 
 ```bash
 npm run check:package
@@ -98,7 +105,7 @@ To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit
 ### Optional real DSH acceptance
 
 `test/fixtures/dsh-acceptance.mjs` is an offline model adapter and live/cold
-session fixture for an installed official DSH `0.2.0-rc.2` or `0.2.1-rc.2` runtime. Mount it
+session fixture for an installed official DSH `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, or `0.2.2-rc.1` runtime (DSH `0.2.2-rc.1` requires Node `>=24.9.0`; earlier hosts support Node `22.19+` or Node `24`). Mount it
 only in a new temporary home whose name contains `message-edit-dsh-qa-`.
 Set `DSH_HOME` to that home and `DSH_QA_MODULES` to the official runtime's
 `node_modules` directory. Use a separate Web profile with the base/Web bundles,
@@ -139,12 +146,12 @@ CI runs this on Linux and Windows in addition to the regression suite.
 npm run build
 npm pack
 ```
-This produces a tarball: `dsh-plugin-message-edit-1.5.0.tgz`.
+This produces a tarball: `dsh-plugin-message-edit-1.6.0.tgz`.
 
 ### Step 2: Install into DSH Profile
 To install into the DSH Desktop profile:
 ```bash
-dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.5.0.tgz
+dsh plugin --profile desktop add file:/path/to/dsh-plugin-message-edit-1.6.0.tgz
 ```
 Or sync files directly into `~/.dsh/profiles/desktop/node_modules/dsh-plugin-message-edit/`.
 
