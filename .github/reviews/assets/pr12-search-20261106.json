@@ -1,0 +1,247 @@
+{
+  "baseline": {
+    "head": "8466e4a038f4da2b4a1c4a2e43e5b0e1143349a2",
+    "query": "NeedleAlbatross",
+    "expected": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+    "actual": "session-qa-live",
+    "wrongTarget": true,
+    "pageErrors": 0,
+    "source": "Observed pre-fix browser command output; the temporary baseline JSON was subsequently overwritten by the passing candidate run."
+  },
+  "searchFresh": [
+    {
+      "foldSidebar": true,
+      "rememberPath": false,
+      "rows": [
+        "Live: two images (1)Message Edit acceptance",
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match."
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": true,
+      "rememberPath": true,
+      "rows": [
+        "Live: two images (1)Message Edit acceptance",
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match."
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": false,
+      "rememberPath": false,
+      "rows": [
+        "Live: two images (1)Message Edit acceptance",
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match.",
+        "Live: two imagesMessage Edit acceptanceNeedleAlbatross unique child content. Live shared match.",
+        "Live: two imagesMessage Edit acceptance"
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": false,
+      "rememberPath": true,
+      "rows": [
+        "Live: two images (1)Message Edit acceptance",
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match.",
+        "Live: two imagesMessage Edit acceptanceNeedleAlbatross unique child content. Live shared match.",
+        "Live: two imagesMessage Edit acceptance"
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    }
+  ],
+  "searchRestart": [
+    {
+      "foldSidebar": true,
+      "rememberPath": false,
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match.",
+        "Live: two images (1)Message Edit acceptance"
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": true,
+      "rememberPath": true,
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match.",
+        "Live: two images (1)Message Edit acceptance"
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": false,
+      "rememberPath": false,
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match.",
+        "Live: two images (1)Message Edit acceptance",
+        "Live: two imagesMessage Edit acceptanceNeedleAlbatross unique child content. Live shared match.",
+        "Live: two imagesMessage Edit acceptance"
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": false,
+      "rememberPath": true,
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceNeedleBadger sibling content. Live shared match.",
+        "Live: two images (1)Message Edit acceptance",
+        "Live: two imagesMessage Edit acceptanceNeedleAlbatross unique child content. Live shared match.",
+        "Live: two imagesMessage Edit acceptance"
+      ],
+      "uniqueHitTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+      "overlapHitTarget": "session-2f14fe40-d657-401d-bda0-508d650d48df",
+      "errors": [],
+      "httpErrors": []
+    }
+  ],
+  "activityBeforeSubagentFix": [
+    {
+      "foldSidebar": false,
+      "stream": {
+        "samples": 363,
+        "missing": 0,
+        "extraSearches": 0,
+        "notifications": 17,
+        "status": 200
+      },
+      "subagent": {
+        "id": "901dc442-82c0-40bf-90e9-259f19a169b3",
+        "during": "- tree \"Sessions\":\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"1 subagent running Live: two images now\"'\n  - 'treeitem \"Live: two images (1) 2min\"'\n  - 'treeitem \"Live: two images 6min\"'\n  - 'treeitem \"Cold: two images 8min\" [selected]'\n  - 'treeitem \"Live: two images 8min\"'",
+        "completed": null,
+        "parent": null
+      },
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": true,
+      "stream": {
+        "samples": 331,
+        "missing": 0,
+        "extraSearches": 0,
+        "notifications": 11,
+        "status": 200
+      },
+      "subagent": {
+        "id": "63b937cd-620f-4c11-a883-cacf0035073a",
+        "during": "- tree \"Sessions\":\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"Live: two images now\"'\n  - 'treeitem \"Live: two images (1) 2min\"'\n  - 'treeitem \"Cold: two images 8min\" [selected]'",
+        "completed": null,
+        "parent": null
+      },
+      "errors": [],
+      "httpErrors": []
+    }
+  ],
+  "activityFinal": [
+    {
+      "foldSidebar": false,
+      "stream": {
+        "samples": 330,
+        "missing": 0,
+        "extraSearches": 0,
+        "notifications": 13,
+        "status": 200
+      },
+      "subagent": {
+        "id": "42582c57-d7b2-48a4-ae77-5f6805a1900f",
+        "during": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"1 subagent running Live: two images now\"'\n  - 'treeitem \"Live: two images (1) 10min\"'\n  - 'treeitem \"Live: two images 14min\"'\n  - 'treeitem \"Cold: two images 16min\" [selected]'\n  - 'treeitem \"Live: two images 16min\"'",
+        "completed": true,
+        "parent": "session-2f14fe40-d657-401d-bda0-508d650d48df"
+      },
+      "errors": [],
+      "httpErrors": []
+    },
+    {
+      "foldSidebar": true,
+      "stream": {
+        "samples": 330,
+        "missing": 0,
+        "extraSearches": 0,
+        "notifications": 11,
+        "status": 200
+      },
+      "subagent": {
+        "id": "81b732ce-61bd-4bd3-970c-980142d8e535",
+        "during": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"1 subagent running Live: two images now\"'\n  - 'treeitem \"Live: two images (1) 11min\"'\n  - 'treeitem \"Cold: two images 17min\" [selected]'",
+        "completed": true,
+        "parent": "session-2f14fe40-d657-401d-bda0-508d650d48df"
+      },
+      "errors": [],
+      "httpErrors": []
+    }
+  ],
+  "lifecycle": {
+    "unread": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"Completed Live: two images now\"'\n  - 'treeitem \"Live: two images (1) 8min\"'\n  - 'treeitem \"Cold: two images 14min\" [selected]'",
+    "rootOpened": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"Completed Live: two images now\" [selected]'\n  - 'treeitem \"Live: two images (1) 8min\"'\n  - 'treeitem \"Cold: two images 14min\"'",
+    "versionOpened": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"Live: two images now\" [selected]'\n  - 'treeitem \"Live: two images (1) 8min\"'\n  - 'treeitem \"Cold: two images 14min\"'",
+    "crossWorkspaceMove": "Official host rejects attachment to a different directory; no synthetic membership was forced.",
+    "moved": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"Live: two images now\" [selected]'\n  - 'treeitem \"Live: two images (1) 8min\"'\n  - 'treeitem \"Cold: two images 14min\"'",
+    "workspaceMembership": [
+      {
+        "title": "Second QA workspace",
+        "sessionIds": [
+          "session-9a43e864-85d9-42cd-aba4-78989980c3fd"
+        ]
+      },
+      {
+        "title": "Message Edit acceptance",
+        "sessionIds": [
+          "session-9173e078-a080-46c9-b634-05168b6c1640",
+          "session-2f14fe40-d657-401d-bda0-508d650d48df",
+          "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+          "session-e42aeec4-960d-4e76-b51c-884bb9a2034b",
+          "session-qa-cold",
+          "session-qa-live"
+        ]
+      }
+    ],
+    "archived": [
+      "session-qa-live"
+    ],
+    "restored": "- tree \"Sessions\":\n  - treeitem \"Second QA workspace\"\n  - treeitem \"Message Edit acceptance\" [expanded]\n  - 'treeitem \"Live: two images now\"'\n  - 'treeitem \"Live: two images (1) 8min\"'\n  - 'treeitem \"Cold: two images 14min\" [selected]'",
+    "errors": [],
+    "httpErrors": [
+      {
+        "path": "/qa/move",
+        "status": 500
+      }
+    ]
+  },
+  "uiEdit": {
+    "newVersion": "session-6e6779e7-6023-49bc-be8f-656f3a884b45",
+    "groupedWithoutReload": true,
+    "narrowSearchTarget": "session-69e2045a-9b12-449a-9908-f2e71858ba89",
+    "layoutOverflow": false,
+    "errors": [],
+    "httpErrors": []
+  },
+  "environment": {
+    "host": "official npm @deepseek-ai/dsh 0.2.2-rc.1",
+    "platform": "Windows Web",
+    "browser": "Microsoft Edge 156.0.4314.58 headless",
+    "node": "24.22.2",
+    "model": "local deterministic QA adapter"
+  }
+}

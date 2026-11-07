@@ -7,12 +7,13 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 assert.ok(process.env.DSH_QA_MODULES, 'Set DSH_QA_MODULES to the official runtime node_modules');
-assert.match(process.env.DSH_HOME ?? '', /message-edit-dsh-qa-/, 'Use a disposable QA home');
+assert.match(process.env.DSH_HOME ?? '', /[\\/]message-edit-dsh-qa-[^\\/]+$/, 'Use a disposable QA home');
 const require = createRequire(join(process.env.DSH_QA_MODULES, 'package.json'));
 const { LlmAdapter, createUserMessage } = await import(pathToFileURL(require.resolve('@deepseek-ai/dsh-llm')));
 const { default: sharp } = await import(pathToFileURL(require.resolve('sharp')));
 
 class LocalReply extends LlmAdapter {
+  constructor(beforeReply) { super(); this.beforeReply = beforeReply; }
   async resolveModel(provider, model) {
     return { provider, id: model, name: 'Local acceptance model', inputModalities: ['text', 'image'],
       reasoning: { efforts: [{ id: 'high', name: 'High' }, { id: 'max', name: 'Max' }] } };
@@ -26,7 +27,16 @@ class LocalReply extends LlmAdapter {
       yield { type: 'reasoning-delta', index: 0, text: "I'll validate this offline probe with a deterministic local reply." };
     }
     const last = options.messages.findLast(message => message.source.kind === 'user');
+    await this.beforeReply?.(last, options.signal);
     const imageCount = last?.content.filter(block => block.type === 'image').length ?? 0;
+    // Browser acceptance can hold a real turn open while observing sidebar
+    // search/status updates. Normal API acceptance keeps its immediate reply.
+    if (last?.content.some(block => block.type === 'text' && block.text.startsWith('QA_STREAM_'))) {
+      for (let index = 0; index < 60; index++) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        yield { type: 'text-delta', index: 0, text: `chunk${index} ` };
+      }
+    }
     yield { type: 'text-delta', index: probe ? 1 : 0, text: `Local QA reply. Received ${imageCount} images.` };
     yield { type: 'finish', reason: { kind: 'stop' } };
   }
@@ -35,8 +45,17 @@ class LocalReply extends LlmAdapter {
 export const inject = ['sessions', 'agents', 'agentLoop', 'llm', 'sessionPersistence', 'sessionQuery',
   'sessionTitle', 'attachments', 'workspaceRegistry', 'webServer'];
 
-export async function apply(ctx) {
-  ctx.llm.registerAdapter(['qa-local'], new LocalReply());
+// These endpoints deliberately expose fixture state; accept only local callers.
+function localRequest(req, res, method) {
+  let sameOrigin = true;
+  try { if (req.headers.origin) sameOrigin = new URL(req.headers.origin).host === req.headers.host; }
+  catch { sameOrigin = false; }
+  if (req.method === method && sameOrigin && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) return true;
+  res.writeHead(403); res.end('Local QA requests only'); return false;
+}
+
+export async function apply(ctx, config = {}) {
+  ctx.llm.registerAdapter(['qa-local'], new LocalReply(config.beforeReply));
   const cwd = join(process.env.DSH_HOME, 'fixture-workspace');
   await mkdir(cwd, { recursive: true });
   const workspace = await ctx.workspaceRegistry.create(cwd, 'Message Edit acceptance');
@@ -72,7 +91,8 @@ export async function apply(ctx) {
     await workspace.attachSession(id);
     if (cold) await handle.dispose();
   }
-  ctx.webServer.register({ kind: 'exact', path: '/qa/state', handler: async (_req, res) => {
+  ctx.webServer.register({ kind: 'exact', path: '/qa/state', handler: async (req, res) => {
+    if (!localRequest(req, res, 'GET')) return;
     try {
     const sessions = await Promise.all((await ctx.sessionQuery.listSessions()).map(async ({ header }) => {
       await ctx.agents.get(header.id)?.whenIdle();
@@ -93,6 +113,7 @@ export async function apply(ctx) {
     }
   } });
   ctx.webServer.register({ kind: 'exact', path: '/qa/followup', handler: async (req, res) => {
+    if (!localRequest(req, res, 'POST')) return;
     let body = '';
     for await (const chunk of req) body += chunk;
     const { sessionId, text } = JSON.parse(body);
@@ -105,6 +126,7 @@ export async function apply(ctx) {
     res.end('{}');
   } });
   ctx.webServer.register({ kind: 'exact', path: '/qa/image-only', handler: async (req, res) => {
+    if (!localRequest(req, res, 'POST')) return;
     let body = '';
     for await (const chunk of req) body += chunk;
     const { text = '', count = 1 } = JSON.parse(body || '{}');

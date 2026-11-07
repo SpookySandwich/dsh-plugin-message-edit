@@ -8,10 +8,10 @@ const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta
 
 test('package declarations admit tested prereleases under default npm semver rules', () => {
   for (const range of [pkg.peerDependencies['@deepseek-ai/dsh'], pkg.engines.dsh]) {
-    for (const version of ['0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5', '0.2.1']) {
+    for (const version of ['0.2.0-rc.2', '0.2.1-rc.2', '0.2.1-rc.5', '0.2.2-rc.1', '0.2.1']) {
       assert.ok(semver.satisfies(version, range), `${version} must satisfy ${range} under default npm semver`);
     }
-    for (const version of ['0.1.5-rc.2', '0.2.1-rc.3', '0.2.1-rc.6', '0.2.2-alpha.1', '0.3.0-rc.1', '0.3.0']) {
+    for (const version of ['0.1.5-rc.2', '0.2.1-rc.3', '0.2.1-rc.6', '0.2.2-alpha.1', '0.2.2-rc.2', '0.3.0-rc.1', '0.3.0']) {
       assert.equal(semver.satisfies(version, range), false, `${version} must be excluded under default npm semver`);
     }
   }

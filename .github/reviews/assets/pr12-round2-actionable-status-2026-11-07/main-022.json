@@ -1,0 +1,130 @@
+{
+  "source": "586e7e7206c42ab6d71953d80ac2025ae024a33c",
+  "host": "0.2.2-rc.1",
+  "browser": "156.0.4314.58",
+  "checks": [
+    {
+      "name": "official full-text search enabled",
+      "preflight": {
+        "ok": true,
+        "value": {
+          "items": [
+            {
+              "sessionId": "session-qa-cold",
+              "snippet": "Original first turn; keep both images."
+            },
+            {
+              "sessionId": "session-qa-live",
+              "snippet": "Original first turn; keep both images."
+            }
+          ],
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "name": "grouping defaults OFF"
+    },
+    {
+      "name": "native root-ID search contract",
+      "supported": true,
+      "host": "0.2.2-rc.1"
+    },
+    {
+      "name": "UI edit with two images immediately groups and selects original",
+      "child": "session-62c7330f-f0aa-4337-ab0d-77a24e6be754"
+    },
+    {
+      "name": "second UI edit preserves family",
+      "sibling": "session-2bef9fa2-5045-4e9a-a288-403f712e7b84"
+    },
+    {
+      "name": "root-content opens root remember=false",
+      "rows": [
+        "Cold: two imagesMessage Edit acceptanceOriginal first turn; keep both images.",
+        "Live: two imagesMessage Edit acceptanceOriginal first turn; keep both images."
+      ]
+    },
+    {
+      "name": "child-content opens child remember=false",
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceChildOnlyZephyr Live edited prompt; keep both images."
+      ]
+    },
+    {
+      "name": "local root title plus child content deduplicates remember=false",
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceChildOnlyZephyr Live edited prompt; keep both images."
+      ]
+    },
+    {
+      "name": "root ID title-only ordinary navigation remember=false",
+      "rows": [
+        "Live: two imagesMessage Edit acceptance"
+      ]
+    },
+    {
+      "name": "root-content opens root remember=true",
+      "rows": [
+        "Cold: two imagesMessage Edit acceptanceOriginal first turn; keep both images.",
+        "Live: two imagesMessage Edit acceptanceOriginal first turn; keep both images."
+      ]
+    },
+    {
+      "name": "child-content opens child remember=true",
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceChildOnlyZephyr Live edited prompt; keep both images."
+      ]
+    },
+    {
+      "name": "local root title plus child content deduplicates remember=true",
+      "rows": [
+        "Live: two imagesMessage Edit acceptanceChildOnlyZephyr Live edited prompt; keep both images."
+      ]
+    },
+    {
+      "name": "root ID title-only ordinary navigation remember=true",
+      "rows": [
+        "Live: two imagesMessage Edit acceptance"
+      ]
+    },
+    {
+      "name": "grouping OFF preserves direct content navigation"
+    },
+    {
+      "name": "hidden unique title opens its version"
+    },
+    {
+      "name": "archived remembered child stays archived and default search hides it",
+      "rows": []
+    },
+    {
+      "name": "no search flicker grouping=false",
+      "samples": 377,
+      "missing": 0,
+      "extraSearches": 0,
+      "catalogChanges": 11
+    },
+    {
+      "name": "no search flicker grouping=true",
+      "samples": 373,
+      "missing": 0,
+      "extraSearches": 0,
+      "catalogChanges": 11
+    },
+    {
+      "name": "Versions tree renders grouped family"
+    },
+    {
+      "name": "no page exceptions or HTTP errors"
+    }
+  ],
+  "errors": [],
+  "httpErrors": [],
+  "family": {
+    "root": "session-qa-live",
+    "child": "session-62c7330f-f0aa-4337-ab0d-77a24e6be754",
+    "sibling": "session-2bef9fa2-5045-4e9a-a288-403f712e7b84",
+    "other": "session-qa-cold"
+  }
+}

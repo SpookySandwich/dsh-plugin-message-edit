@@ -49,12 +49,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        dsh: [0.2.0-rc.2, 0.2.1-rc.2, 0.2.1-rc.5]
+        dsh: [0.2.0-rc.2, 0.2.1-rc.2, 0.2.1-rc.5, 0.2.2-rc.1]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run build

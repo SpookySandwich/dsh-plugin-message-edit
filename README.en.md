@@ -5,7 +5,7 @@ English | [简体中文](README.md)
 [![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
 [![CI](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-0.2.1--rc.5-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.1-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 Edit a message you already sent and the conversation **rewinds and branches** from that point, the way ChatGPT, Claude and DeepSeek all do it. The old version is not overwritten — a `‹ 2/4 ›` counter appears under the bubble, and a Versions tab draws the whole tree.
@@ -31,6 +31,20 @@ No matter how deeply conversations diverge or how many times prompts are edited,
 - **Durable.** Every branch is a real persisted session, and version links are stored as durable events so the tree survives restarts. New branches automatically group into the parent session's workspace.
 
 ## Interface style
+
+In **Settings → Message editing**, enable **Group versions into one sidebar entry** to show an original conversation and its recorded edit/retry version family as a single sidebar row, including in search results. This option is **off by default** to preserve the existing list behavior.
+
+- **Scope and lineage.** Each recorded edit/version family collapses to its original root row while all branches remain accessible in the **Versions** tab and `‹ n/m ›` bubble switcher. Native independent conversation copies (such as **Branch into a new conversation** in DSH `0.2.2-rc.1`, which deliberately omits parent lineage) have no recorded parentage and remain separate root entries. Orphan branches whose parent is missing remain visible, and subagents are never merged into ordinary conversation versions.
+- **Root ownership and aggregated activity.** The grouped row retains the original root session's actual title, workspace membership, pin state, and archive state. Pinning or archiving the grouped row acts on the root session only (it never batch-archives, deletes, or rewrites family branches). Latest activity timestamps, running states, and running subagent counts (`runningChildCount`) are aggregated across the family, and viewing any branch highlights the shared row.
+- **Actionable status and click priority.** Projected status flags and ordinary row clicks use the same set of eligible, visible, non-archived ordinary family members (preferring the original root first within each priority level, then native catalog order):
+  1. **Eligible pending interaction** (`approval`, `plan-review`, or `question`) first,
+  2. **Eligible unread completion** next,
+  3. **Remembered non-archived version** (when **Remember the version I was viewing** is enabled) or the **original root** as fallback.
+  Actionable status temporarily takes priority over the remembered version so hidden attention states remain directly reachable. The host acknowledges only the specific session actually opened (there is no automatic bulk mark-read across the family), so multiple unread versions can be visited individually on subsequent clicks.
+- **Search navigation and known limits.** Clicking a search result with an explicit content snippet (or a unique hidden-version match) opens that matched version directly, taking precedence over pending/unread status and the remembered version:
+  1. In **Show archived** (`All conversations`), if the root is live and only archived hidden versions match a content search, the grouped result can render with the live root's styling and without an inline `Unarchive` button; clicking it clears the search query and displays the native archived-session notice (`Archived sessions cannot be opened. Unarchive it to view.`) rather than navigating or unarchiving. Unarchive the branch from the **Versions** tab or the ungrouped archived view instead.
+  2. When full-text search is disabled and multiple hidden versions share a matching title (without the root title matching), clicking the deduplicated family hit opens a matching version (the first eligible match), not necessarily the remembered version.
+  3. On older hosts (`0.2.0-rc.2`, `0.2.1-rc.2`, and `0.2.1-rc.5`), grouped fallback search can match hidden version session IDs, whereas native ordinary/root session-ID search is not supported by those hosts; DSH `0.2.2-rc.1` supports session-ID search for all sessions.
 
 The three interfaces this imitates differ in **where the controls sit and which ones exist**, so the preset changes exactly that — never the colours, which stay native to DSH. Pick one under **Settings → Message Tree**; the panel previews it live.
 
@@ -72,7 +86,9 @@ For technical details and developer guides, see:
 
 ## Compatibility
 
-Version `1.5.0` (current source): Support official DSH `0.2.1-rc.5` while retaining `0.2.0-rc.2` and `0.2.1-rc.2` compatibility. Declared host compatibility ranges (`peerDependencies` and `engines.dsh`) explicitly include `0.2.1-rc.5` (`>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5`). Verified on official `0.2.0-rc.2`, `0.2.1-rc.2`, and `0.2.1-rc.5` runtimes for fresh and restart acceptance, user message edits with retained images, version navigation, retry branching, and 400px More-menu navigation.
+Version `1.6.0` (current source): Add opt-in sidebar grouping for conversation versions ([#12](https://github.com/SpookySandwich/dsh-plugin-message-edit/pull/12), contributed by [@ganpig](https://github.com/ganpig)) and support official DSH `0.2.2-rc.1` (upstream tag `dsh-v0.2.2-rc.1`, commit `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`) while retaining `0.2.0-rc.2`, `0.2.1-rc.2`, and `0.2.1-rc.5` compatibility. Declared host compatibility ranges (`peerDependencies` and `engines.dsh`) explicitly include `0.2.2-rc.1` (`>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1`). Official DSH `0.2.2-rc.1` requires Node `>=24.9.0`; the plugin retains Node `22.19+` and Node `24` compatibility for earlier supported DSH hosts without adding a higher global Node floor. Includes recorded-lineage sidebar grouping (off by default), root-owned workspace/pin/archive semantics, family running and subagent activity aggregation, actionable status priority (`approval`/`plan-review`/`question` → unread completion → remembered/root fallback with per-session host acknowledgement), explicit content-search target routing, streaming-stable search callbacks, native user-message text-interaction source marking for DSH `0.2.2` Quote selection, and light-theme card/control surface contrast (`--dsw-alias-bg-base`). Verified across 102 automated tests, release/package checks, fresh and restart API acceptance on official `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, and `0.2.2-rc.1` runtimes, and isolated real-browser Web acceptance on official `0.2.2-rc.1` and `0.2.1-rc.5`.
+
+Version `1.5.0`: Support official DSH `0.2.1-rc.5` while retaining `0.2.0-rc.2` and `0.2.1-rc.2` compatibility. Declared host compatibility ranges (`peerDependencies` and `engines.dsh`) explicitly include `0.2.1-rc.5` (`>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5`). Verified on official `0.2.0-rc.2`, `0.2.1-rc.2`, and `0.2.1-rc.5` runtimes for fresh and restart acceptance, user message edits with retained images, version navigation, retry branching, and 400px More-menu navigation.
 
 Version `1.4.1`: Override `@deepseek-ai/dsh-mcp-client` to `@modelcontextprotocol/client` `2.3.0` (with `@modelcontextprotocol/core` `2.3.0`) in this repository's checkout lockfile to cover [GHSA-6qxp-vccf-f47h](https://github.com/advisories/GHSA-6qxp-vccf-f47h) (`CVE-2026-104850`, fixed in `2.2.0`) and [GHSA-6prh-2h8m-c8cw](https://github.com/advisories/GHSA-6prh-2h8m-c8cw) (`CVE-2026-111769`, custom-header/body cross-origin redirect disclosure, fixed in `2.3.0`; Node HTTP transports in `2.3.0` follow same-origin redirects only and require the final URL for cross-origin MCP endpoints). This hardens development/test checkouts of this repository only; npm ignores dependency `overrides` and does not ship `package-lock.json`, so installing the plugin does not modify an existing user's DSH host.
 
@@ -88,16 +104,16 @@ Version `1.2.0`: Unarchive a version through `workspaceRegistry.unarchiveSession
 
 Version `1.1.0`: Fix seeded edit/retry creation, clear inherited pending input before publication, identify version markers by session ownership, preserve reasoning effort, and read persisted branches through disposable session observations.
 
-The declared host range is `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5`; official dsh `0.2.0-rc.2`, `0.2.1-rc.2`, and `0.2.1-rc.5` satisfy it. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/dsh-0.2.1-rc.5.md).
+The declared host range is `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1`; official dsh `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, and `0.2.2-rc.1` satisfy it. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/pr12-round2-actionable-status-2026-11-07.md) ([runtime matrix](.github/reviews/pr12-current-runtime-2026-11-07.md)).
 
-Install published versions from [npm](https://www.npmjs.com/package/dsh-plugin-message-edit). To test the current source, run `npm ci` and `npm pack`, then `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.5.0.tgz`. See the [release procedure](.github/RELEASING.md) for publication checks.
+Install published versions from [npm](https://www.npmjs.com/package/dsh-plugin-message-edit). To test the current source, run `npm ci` and `npm pack`, then `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.6.0.tgz`. See the [release procedure](.github/RELEASING.md) for publication checks.
 
 Version `1.1.0` has been verified in an isolated DSH `0.1.5-rc.2` Web environment:
 plugin loading, images, edit/retry, nested branches, and restored sessions. Model
 responses use a local test adapter; remote model services were not exercised.
 
 The compatibility layer retains the older `events` / `seedLength` interfaces,
-covered by automated tests. This release targets official dsh `0.2.1-rc.5`.
+covered by automated tests. This release targets official dsh `0.2.2-rc.1`.
 Restart DSH after updating the plugin.
 
 Coexists with [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream) and [dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout).

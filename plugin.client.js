@@ -143,12 +143,258 @@ const restoredFamilies = new Set();
 // While a root is in here we must not record it as the selection.
 const pendingRestore = new Set();
 
+// Sidebar-only projection: the real catalog remains available to VersionsView.
+function sidebarRoot(id, byId) {
+  const seen = new Set([id]);
+  let current = id;
+  while (byId[current] && byId[current].origin !== 'subagent') {
+    const parent = byId[current].parentId;
+    if (!parent || !byId[parent] || byId[parent].origin === 'subagent' || seen.has(parent)) break;
+    seen.add(parent);
+    current = parent;
+  }
+  return current;
+}
+
+function sidebarList(list) {
+  // Native subagent activity can use byId-only entries absent from list.ids.
+  const byId = Object.fromEntries(Object.entries(list.byId).filter(([, row]) => row.origin === 'subagent'));
+  const ids = [];
+  const seen = new Set();
+  const catalogs = new Map();
+  for (const id of list.ids) {
+    const session = list.byId[id];
+    if (!session) continue;
+    const root = sidebarRoot(id, list.byId);
+    if (!seen.has(root)) {
+      byId[root] = { ...list.byId[root], retainedBy: { ...list.byId[root].retainedBy } };
+      ids.push(root);
+      seen.add(root);
+    }
+    const row = byId[root];
+    row.updatedAt = Math.max(row.updatedAt || 0, session.updatedAt || 0);
+    row.running = row.running || session.running;
+    if (id !== root) row.retainedBy.mainView = (row.retainedBy.mainView || 0) + (session.retainedBy?.mainView || 0);
+    // Native runningChildCount reads the owning session's projection, not its
+    // parentId links. Seeded versions can inherit the same catalog entries.
+    for (const child of list.projectionsBySession?.[id]?.values.subagentCatalog || []) {
+      if (!catalogs.has(root)) catalogs.set(root, new Map());
+      catalogs.get(root).set(child.id, child);
+    }
+  }
+  const projectionsBySession = list.projectionsBySession && { ...list.projectionsBySession };
+  for (const [root, children] of catalogs) {
+    const projection = projectionsBySession[root];
+    projectionsBySession[root] = { ...projection, values: { ...projection?.values, subagentCatalog: [...children.values()] } };
+  }
+  return { ...list, ids, byId, ...(projectionsBySession ? { projectionsBySession } : {}) };
+}
+
+// Only project actionable flags from ordinary, openable family members. Use
+// the same candidates for display and navigation; native read/approval state
+// belongs to each real session and is never acknowledged by this projection.
+function sidebarAttention(statuses, list, workspaces) {
+  const attention = new Map();
+  if (!statuses) return attention;
+  const archived = new Set(workspaces.archivedSessionIds);
+  // Prefer the original within each priority, then native catalog order.
+  const ids = new Set([...list.ids.map(id => sidebarRoot(id, list.byId)), ...list.ids]);
+  for (const id of ids) {
+    const session = list.byId[id];
+    const root = sidebarRoot(id, list.byId);
+    if (!session || session.blank || session.origin === 'subagent' || archived.has(id) || archived.has(root)) continue;
+    const status = statuses.get(id);
+    if (!status) continue;
+    const pending = ['approval', 'plan-review', 'question'].includes(status.pendingInteraction?.kind);
+    const completed = status.completionUnread === true && !(status.running ?? session.running);
+    if (!pending && !completed) continue;
+    if (!attention.has(root)) attention.set(root, {});
+    const row = attention.get(root);
+    if (pending && !row.pending) row.pending = { id, interaction: status.pendingInteraction };
+    if (completed && !row.completed) row.completed = id;
+  }
+  return attention;
+}
+
+function sidebarStatuses(statuses, list, attention, workspaces) {
+  if (!statuses) return statuses;
+  const grouped = new Map(statuses);
+  for (const [id, status] of statuses) {
+    const root = sidebarRoot(id, list.byId);
+    if (id === root) continue;
+    const row = grouped.get(root);
+    grouped.set(root, { ...row,
+      running: row?.running || status.running,
+    });
+  }
+  for (const root of new Set(list.ids.map(id => sidebarRoot(id, list.byId)))) {
+    if (list.byId[root]?.origin === 'subagent' || workspaces.archivedSessionIds.includes(root)) continue;
+    const flags = attention.get(root);
+    grouped.set(root, { ...grouped.get(root),
+      completionUnread: !!flags?.completed,
+      pendingInteraction: flags?.pending?.interaction,
+    });
+  }
+  return grouped;
+}
+
+function sidebarWorkspaces(state, list) {
+  // Menus still act on the original session. Keep its real workspace, pin and
+  // archive membership, including Ungrouped, rather than projecting a child's
+  // membership onto a row whose native actions would disagree with it.
+  const originals = ids => ids.filter(id => sidebarRoot(id, list.byId) === id);
+  return {
+    ...state,
+    items: state.items.map(item => ({ ...item, sessionIds: originals(item.sessionIds) })),
+    pinnedSessionIds: originals(state.pinnedSessionIds),
+    archivedSessionIds: originals(state.archivedSessionIds),
+  };
+}
+
+function sidebarSearch(result, list, workspaces, archivedFilter, query = '', targets) {
+  if (!result?.items) return result;
+  // The native title/id search sees the projected originals only. Preserve
+  // those matches for hidden branches as well, even when full-text search is
+  // disabled by the host. Native result limits and hasMore still apply.
+  const q = query.trim().toLowerCase();
+  const archived = new Set(workspaces.archivedSessionIds);
+  const visible = id => {
+    const row = list.byId[id];
+    return row && !row.blank && row.origin !== 'subagent'
+      && (archivedFilter === 'show' || (archivedFilter === 'only' ? archived.has(id) : !archived.has(id)));
+  };
+  const titleOrIdMatches = id => q && ((list.byId[id]?.title || '').toLowerCase().includes(q) || id.toLowerCase().includes(q));
+  const rootMatches = id => {
+    const cwd = list.byId[id]?.cwd || '';
+    const label = workspaces.items.find(item => item.sessionIds.includes(id))?.title
+      ?? (cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || cwd);
+    return q && (titleOrIdMatches(id) || label.toLowerCase().includes(q));
+  };
+  const local = q ? list.ids.filter(id => {
+    return visible(id) && sidebarRoot(id, list.byId) !== id && titleOrIdMatches(id);
+  }).map(sessionId => ({ sessionId })) : [];
+  const families = new Map();
+  for (const item of [...result.items, ...local]) {
+    const sessionId = sidebarRoot(item.sessionId, list.byId);
+    // Host search takes no archive filter. Filter real versions before merging,
+    // and keep the original's archive visibility for the grouped entry itself.
+    if (!visible(item.sessionId) || !visible(sessionId)) continue;
+    if (!families.has(sessionId)) families.set(sessionId, []);
+    families.get(sessionId).push(item);
+  }
+  return { ...result, items: [...families].map(([sessionId, matches]) => {
+    const ordinary = rootMatches(sessionId);
+    const live = matches.filter(item => !archived.has(item.sessionId));
+    // In Show archived, an archived hit must not block a matching live member
+    // (including a native local root match that is absent from Host results).
+    if (!live.length && ordinary && !archived.has(sessionId)) return { sessionId };
+    const candidates = live.length ? live : matches;
+    const item = candidates.find(item => item.snippet) || candidates[0];
+    // A shared title alone does not express a request to change versions.
+    // Any displayed content snippet selects its source, including the root.
+    // Without one, only a hidden-only match selects a particular version.
+    if (item.snippet || (item.sessionId !== sessionId && !ordinary)) targets.set(sessionId, item.sessionId);
+    return { ...item, sessionId };
+  }) };
+}
+
+function installSidebarGrouping(slots) {
+  if (typeof slots.entriesOfSlot !== 'function') return;
+  return slots.inject('sidebar.workspaces', function () {
+    const entry = slots.entriesOfSlot('sidebar.workspaces').find(row => row.component);
+    if (!entry) return;
+    const Original = entry.component;
+    function GroupedSidebar(props) {
+      const prefs = usePrefs();
+      const list = props.useSessions(state => state);
+      const searchRequest = React.useRef(null);
+      const workspaces = props.useWorkspaces(state => state);
+      const latestView = React.useRef(null);
+      const archivedFilter = props.useStore ? props.useStore(state => state.archivedFilter ?? 'default') : 'default';
+      const archiveKey = JSON.stringify([...workspaces.archivedSessionIds].sort());
+      const statuses = props.useSessionStatus ? props.useSessionStatus(state => state) : null;
+      const grouped = React.useMemo(() => sidebarList(list), [list]);
+      const groupedWorkspaces = React.useMemo(() => sidebarWorkspaces(workspaces, list), [workspaces, list]);
+      const attention = React.useMemo(() => sidebarAttention(statuses, list, workspaces), [statuses, list, workspaces]);
+      const groupedStatuses = React.useMemo(() => sidebarStatuses(statuses, list, attention, workspaces), [statuses, list, attention, workspaces]);
+      latestView.current = { list, workspaces, attention };
+      const active = list.ids.find(id => (list.byId[id]?.retainedBy?.mainView || 0) > 0);
+      React.useEffect(() => {
+        if (prefs.foldSidebar && active) activePathStore.set(sidebarRoot(active, list.byId), active);
+      }, [active, list, prefs.foldSidebar]);
+      const useSessions = selector => props.useSessions(state => selector(state === list ? grouped : sidebarList(state)));
+      const useWorkspaces = selector => props.useWorkspaces(() => selector(groupedWorkspaces));
+      const useSessionStatus = selector => props.useSessionStatus(() => selector(groupedStatuses));
+      const open = id => {
+        // An older rendered handler must not use a cleared flag, removed
+        // version or newly archived destination after a newer snapshot arrived.
+        const { list, workspaces, attention } = latestView.current;
+        const request = searchRequest.current;
+        searchRequest.current = null;
+        if (workspaces.archivedSessionIds.includes(id)) {
+          props.notifyArchivedNotOpenable?.();
+          return;
+        }
+        // Native search keeps its AbortSignal alive through openSearchResult's
+        // synchronous open call, then aborts it when the query clears/changes.
+        // Keep root IDs for its local-title/content merge, but navigate to the
+        // version that supplied the displayed snippet. Never persist this map.
+        if (request && !request.signal?.aborted) {
+          const target = request.targets.get(id);
+          if (workspaces.archivedSessionIds.includes(target)) {
+            props.notifyArchivedNotOpenable?.();
+            return;
+          }
+          if (target && list.byId[target]) {
+            activePathStore.set(id, target);
+            props.open(target);
+            return;
+          }
+        }
+        const flags = attention.get(id);
+        const actionable = flags?.pending?.id || flags?.completed;
+        if (actionable) {
+          // Also pin a root destination so the bubble-level remembered-path
+          // restore cannot undo navigation to the original's pending work.
+          activePathStore.set(id, actionable);
+          props.open(actionable);
+          return;
+        }
+        const remembered = activePathStore.get(id);
+        props.open(prefs.rememberPath && remembered && list.byId[remembered] && !workspaces.archivedSessionIds.includes(remembered) ? remembered : id);
+      };
+      // Native search clears its results whenever this callback changes.
+      // Catalog/status updates must not restart an otherwise unchanged query;
+      // archive membership/filter changes must remove newly hidden snippets.
+      const searchSessions = React.useCallback(async (...args) => {
+        const request = { signal: args[1], targets: new Map() };
+        searchRequest.current = request;
+        const project = result => sidebarSearch(result, latestView.current.list, latestView.current.workspaces, archivedFilter, args[0], request.targets);
+        try { return project(await props.searchSessions(...args)); }
+        catch (error) {
+          if (args[1]?.aborted) throw error;
+          const local = project({ items: [], hasMore: false });
+          if (!local.items.length) throw error;
+          return local;
+        }
+      }, [props.searchSessions, archivedFilter, archiveKey]);
+      return React.createElement(Original, prefs.foldSidebar ? { ...props, useSessions, useWorkspaces,
+        ...(props.useSessionStatus ? { useSessionStatus } : {}), open, searchSessions } : props);
+    }
+    // Reuse the native entry so its child slots, store and menus stay intact.
+    entry.component = GroupedSidebar;
+    return function () { if (entry.component === GroupedSidebar) entry.component = Original; };
+  });
+}
+
 /* --------------------------------------------------------------- prefs -- */
 
 // Behaviour toggles, persisted next to the style choice. Both default to the
 // behaviour the user asked for rather than the old one.
 const PREFS_KEY = 'dsh-plugin-message-tree:prefs';
 const PREFS_DEFAULTS = {
+  // Opt in to one sidebar entry per conversation family.
+  foldSidebar: false,
   // Restore the last-viewed branch when reopening a conversation.
   rememberPath: true,
   // Cancel a still-running turn before an edit forks the conversation.
@@ -791,7 +1037,7 @@ const CSS = [
   '.mtx-edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}',
   '.mtx-edge{fill:none;stroke:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 45%,transparent);stroke-width:1.5}',
   '.mtx-edge[data-path]{stroke:var(--dsw-alias-accent-primary,#4b8dff);stroke-width:2}',
-  '.mtx-card{position:absolute;left:0;top:0;width:176px;box-sizing:border-box;display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:13px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 30%,transparent);background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 10%,var(--dsw-alias-bg-primary,rgba(30,30,34,.9)));box-shadow:0 2px 10px rgba(0,0,0,.14);cursor:pointer;will-change:transform;transition:box-shadow 180ms ease,border-color 180ms ease}',
+  '.mtx-card{position:absolute;left:0;top:0;width:176px;box-sizing:border-box;display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:13px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 30%,transparent);background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 10%,var(--dsw-alias-bg-base,Canvas));box-shadow:0 2px 10px rgba(0,0,0,.14);cursor:pointer;will-change:transform;transition:box-shadow 180ms ease,border-color 180ms ease}',
   '.mtx-card:hover{box-shadow:0 6px 22px rgba(0,0,0,.24);border-color:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 55%,transparent)}',
   '.mtx-card[data-current]{border-color:var(--dsw-alias-accent-primary,#4b8dff);box-shadow:0 0 0 1px var(--dsw-alias-accent-primary,#4b8dff),0 6px 24px color-mix(in srgb,var(--dsw-alias-accent-primary,#4b8dff) 30%,transparent)}',
   '.mtx-card[data-dragging]{cursor:grabbing;box-shadow:0 14px 34px rgba(0,0,0,.3);z-index:3}',
@@ -804,7 +1050,7 @@ const CSS = [
   '.mtx-card-title{font-size:12.5px;font-weight:600;line-height:17px;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
   '.mtx-card-sub{font-size:11px;line-height:15px;margin-top:2px;color:var(--dsw-alias-label-tertiary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
   '.mtx-graph-tools{position:absolute;top:12px;right:14px;display:flex;gap:6px;z-index:4}',
-  '.mtx-tool{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 30%,transparent);background:var(--dsw-alias-bg-primary,rgba(30,30,34,.85));color:var(--dsw-alias-label-secondary,#bbb);cursor:pointer;font-size:14px}',
+  '.mtx-tool{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 30%,transparent);background:var(--dsw-alias-bg-base,Canvas);color:var(--dsw-alias-label-secondary,#bbb);cursor:pointer;font-size:14px}',
   '.mtx-tool:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}',
   '.mtx-empty{position:absolute;left:0;right:0;bottom:26px;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:12.5px;pointer-events:none}',
   '.mtx-graph .mtx-link{position:absolute;right:14px;bottom:10px;font-size:12px;color:var(--dsw-alias-label-tertiary);text-decoration:none;z-index:4}',
@@ -845,7 +1091,7 @@ const CSS = [
   '.mtx-set{display:flex;flex-direction:column;gap:12px;max-width:560px;font-size:14px;color:var(--dsw-alias-label-primary)}',
   '.mtx-set-row{display:flex;align-items:center;justify-content:space-between;gap:12px}',
   '.mtx-set-label{font-size:13px}',
-  '.mtx-select{border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 34%,transparent);background:var(--dsw-alias-bg-primary,rgba(30,30,34,.6));color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;padding:6px 10px;outline:none;cursor:pointer}',
+  '.mtx-select{border-radius:9px;border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 34%,transparent);background:var(--dsw-alias-bg-base,Canvas);color:var(--dsw-alias-label-primary);font:inherit;font-size:13px;padding:6px 10px;outline:none;cursor:pointer}',
   '.mtx-set-hint{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}',
   '.mtx-preview{margin-top:2px;padding:18px 16px 16px;border-radius:12px;background:color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 7%,transparent);border:1px solid color-mix(in srgb,var(--dsw-alias-label-tertiary,#888) 16%,transparent);pointer-events:none}',
   '.mtx-preview .mtx-editor{margin-top:12px}',
@@ -875,6 +1121,7 @@ return {
     }
     // DSH 0.2 keeps catalog data in sessions and navigation in uiWorkspace.
     const navigation = { list: sessions.list, openVersion: id => uiWorkspace.openSession(id) };
+    installSidebarGrouping(slots);
 
     ctx.effect(function () {
       if (sessions && sessions.list && typeof sessions.list.subscribe === 'function') {
@@ -931,6 +1178,8 @@ return {
         deletedVersion: 'Deleted version',
         archivedTag: 'Archived',
         rememberPathLabel: 'Remember the version I was viewing',
+        foldSidebarLabel: 'Group versions into one sidebar entry',
+        foldSidebarHint: 'Keep all branches in the Versions tree while showing only the original conversation in the sidebar and search results.',
         rememberPathHint: 'Reopening a conversation returns to the branch you last had open instead of the original. Off means it always opens the first version.',
         stopOnEditLabel: 'Stop the running reply when I edit',
         stopOnEditHint: 'Editing or retrying cancels every reply still being generated in this conversation before branching, including other versions, so no superseded answer keeps spending tokens. This also lets you edit mid-reply. Off leaves them running.',
@@ -970,6 +1219,8 @@ return {
         deletedVersion: '已删除的版本',
         archivedTag: '已归档',
         rememberPathLabel: '记住我正在查看的版本',
+        foldSidebarLabel: '侧栏同一对话只显示一个入口',
+        foldSidebarHint: '侧栏和搜索合并同一对话的分支，所有版本仍可在版本树中查看和切换。',
         rememberPathHint: '重新打开会话时回到上次查看的分支，而不是最初那条。关闭后始终打开第一个版本。',
         stopOnEditLabel: '编辑时中止正在生成的回复',
         stopOnEditHint: '编辑或重试时，先取消该会话中所有仍在生成的回复（包括其它版本）再分支，避免被取代的回答继续消耗额度；同时允许在回复过程中直接编辑。关闭后它们会继续跑完。',
@@ -1009,6 +1260,8 @@ return {
         deletedVersion: 'Удалённая версия',
         archivedTag: 'В архиве',
         rememberPathLabel: 'Запоминать версию, которую я смотрел',
+        foldSidebarLabel: 'Объединять версии в одну строку боковой панели',
+        foldSidebarHint: 'Показывать исходный разговор в списке и поиске, сохраняя все ветки в дереве версий.',
         rememberPathHint: 'При открытии разговора возвращаться к последней открытой ветке, а не к исходной. Выключено — всегда открывается первая версия.',
         stopOnEditLabel: 'Останавливать текущий ответ при редактировании',
         stopOnEditHint: 'При редактировании или повторе отменить все ещё генерирующиеся ответы в этом разговоре, включая другие версии, прежде чем создавать ветку. Это же позволяет редактировать во время ответа. Выключено — они продолжают генерироваться.',
@@ -1205,7 +1458,7 @@ return {
         // Never chase a branch that no longer exists (a deleted branch may
         // still appear here as a non-openable ghost).
         const target = versions.find(function (v) { return v.sessionId === remembered; });
-        if (!target || target.deleted) return;
+        if (!target || target.deleted || target.archived) return;
         restoredFamilies.add(root);
         pendingRestore.add(root);
         openVersionTarget(navigation, target);
@@ -1357,7 +1610,7 @@ return {
       return React.createElement('div', { className: 'mtx-row', 'data-turn': turn, 'data-session': sessionId },
         nativeImages ? React.createElement('div', { className: 'mtx-native-images' }, imageView) : null,
         !nativeImages || text ? React.createElement('div', { className: 'mtx-line' },
-          React.createElement('div', { className: 'mtx-bubble' },
+          React.createElement('div', { className: 'mtx-bubble', 'data-text-interaction-source': text ? '' : undefined },
             text,
             nativeImages ? null : imageView
           )
@@ -1684,7 +1937,7 @@ return {
         React.createElement('div', { className: 'mtx-set-row' },
           React.createElement('span', { className: 'mtx-set-label' }, props.label),
           React.createElement('input', {
-            type: 'checkbox', checked: props.checked, onChange: props.onChange,
+            type: 'checkbox', checked: props.checked, onChange: props.onChange, 'aria-label': props.label,
           })
         ),
         React.createElement('div', { className: 'mtx-set-hint' }, props.hint)
@@ -1707,6 +1960,12 @@ return {
           )
         ),
         React.createElement('div', { className: 'mtx-set-hint' }, t('styleDesc_' + style)),
+        React.createElement(Toggle, {
+          label: t('foldSidebarLabel'),
+          hint: t('foldSidebarHint'),
+          checked: prefs.foldSidebar,
+          onChange: function (e) { prefsStore.set({ foldSidebar: e.target.checked }); },
+        }),
         React.createElement(Toggle, {
           label: t('rememberPathLabel'),
           hint: t('rememberPathHint'),

@@ -1,0 +1,357 @@
+{
+    "checkedAt":  "2026-11-07T16:10:40.4524460Z",
+    "hosts":  [
+                  {
+                      "host":  81088,
+                      "runner":  109684,
+                      "home":  "message-edit-dsh-qa-round2-022",
+                      "modules":  "\u003ctask-root\u003e\\runtime\\node_modules",
+                      "version":  "0.2.2-rc.1",
+                      "started":  "2026-11-07T15:55:01.654Z"
+                  },
+                  {
+                      "host":  65220,
+                      "runner":  109948,
+                      "home":  "message-edit-dsh-qa-round2-022",
+                      "modules":  "\u003ctask-root\u003e\\runtime\\node_modules",
+                      "version":  "0.2.2-rc.1",
+                      "started":  "2026-11-07T15:59:54.921Z"
+                  },
+                  {
+                      "host":  15948,
+                      "runner":  70220,
+                      "home":  "message-edit-dsh-qa-round2-rc5",
+                      "modules":  "\u003ctask-root\u003e\\runtime-rc5\\node_modules",
+                      "version":  "0.2.1-rc.5",
+                      "started":  "2026-11-07T15:59:54.917Z"
+                  },
+                  {
+                      "host":  52848,
+                      "runner":  107596,
+                      "home":  "message-edit-dsh-qa-round2-matrix",
+                      "modules":  "\u003ctask-root\u003e\\runtime\\node_modules",
+                      "version":  "0.2.2-rc.1",
+                      "started":  "2026-11-07T16:02:09.913Z"
+                  },
+                  {
+                      "host":  59376,
+                      "runner":  52228,
+                      "home":  "message-edit-dsh-qa-round2-matrix",
+                      "modules":  "\u003ctask-root\u003e\\runtime\\node_modules",
+                      "version":  "0.2.2-rc.1",
+                      "started":  "2026-11-07T16:07:01.966Z"
+                  },
+                  {
+                      "host":  29488,
+                      "runner":  60228,
+                      "home":  "message-edit-dsh-qa-round2-matrix",
+                      "modules":  "\u003ctask-root\u003e\\runtime\\node_modules",
+                      "version":  "0.2.2-rc.1",
+                      "started":  "2026-11-07T16:09:00.988Z"
+                  }
+              ],
+    "api":  [
+                {
+                    "version":  "0.2.2-rc.1",
+                    "phase":  "fresh",
+                    "pid":  11032,
+                    "home":  "message-edit-dsh-qa-ObQbKA",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.2-rc.1",
+                    "phase":  "restart",
+                    "pid":  114056,
+                    "home":  "message-edit-dsh-qa-ObQbKA",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.1-rc.5",
+                    "phase":  "fresh",
+                    "pid":  75408,
+                    "home":  "message-edit-dsh-qa-GyDJrf",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.1-rc.5",
+                    "phase":  "restart",
+                    "pid":  54436,
+                    "home":  "message-edit-dsh-qa-GyDJrf",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.1-rc.2",
+                    "phase":  "fresh",
+                    "pid":  40884,
+                    "home":  "message-edit-dsh-qa-BHt82b",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.1-rc.2",
+                    "phase":  "restart",
+                    "pid":  19796,
+                    "home":  "message-edit-dsh-qa-BHt82b",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.0-rc.2",
+                    "phase":  "fresh",
+                    "pid":  53768,
+                    "home":  "message-edit-dsh-qa-j43N5E",
+                    "homeExists":  false
+                },
+                {
+                    "version":  "0.2.0-rc.2",
+                    "phase":  "restart",
+                    "pid":  75664,
+                    "home":  "message-edit-dsh-qa-j43N5E",
+                    "homeExists":  false
+                }
+            ],
+    "browserLifecycle":  [
+                             {
+                                 "name":  "status-before",
+                                 "pid":  20848,
+                                 "started":  "2026-11-07T15:55:25.888Z"
+                             },
+                             {
+                                 "name":  "status-before",
+                                 "pid":  20848,
+                                 "stopped":  "2026-11-07T15:55:39.507Z"
+                             },
+                             {
+                                 "name":  "status-after",
+                                 "pid":  87828,
+                                 "started":  "2026-11-07T16:00:23.034Z"
+                             },
+                             {
+                                 "name":  "status-after",
+                                 "pid":  87828,
+                                 "stopped":  "2026-11-07T16:01:13.988Z"
+                             },
+                             {
+                                 "name":  "status-final",
+                                 "pid":  72692,
+                                 "started":  "2026-11-07T16:05:01.409Z"
+                             },
+                             {
+                                 "name":  "status-final",
+                                 "pid":  72692,
+                                 "stopped":  "2026-11-07T16:05:55.505Z"
+                             },
+                             {
+                                 "name":  "sidebar-current",
+                                 "pid":  78808,
+                                 "started":  "2026-11-07T16:00:55.512Z"
+                             },
+                             {
+                                 "name":  "sidebar-current",
+                                 "pid":  78808,
+                                 "stopped":  "2026-11-07T16:01:16.463Z"
+                             },
+                             {
+                                 "name":  "status-after",
+                                 "pid":  41220,
+                                 "started":  "2026-11-07T16:01:38.585Z"
+                             },
+                             {
+                                 "name":  "status-after",
+                                 "pid":  41220,
+                                 "stopped":  "2026-11-07T16:02:24.637Z"
+                             },
+                             {
+                                 "name":  "status-final",
+                                 "pid":  34452,
+                                 "started":  "2026-11-07T16:05:01.483Z"
+                             },
+                             {
+                                 "name":  "status-final",
+                                 "pid":  34452,
+                                 "stopped":  "2026-11-07T16:05:50.613Z"
+                             },
+                             {
+                                 "name":  "sidebar-current",
+                                 "pid":  109376,
+                                 "started":  "2026-11-07T16:05:01.481Z"
+                             },
+                             {
+                                 "name":  "sidebar-current",
+                                 "pid":  109376,
+                                 "stopped":  "2026-11-07T16:05:28.021Z"
+                             },
+                             {
+                                 "name":  "sidebar-restart",
+                                 "pid":  58252,
+                                 "started":  "2026-11-07T16:07:45.896Z"
+                             },
+                             {
+                                 "name":  "sidebar-restart",
+                                 "pid":  58252,
+                                 "stopped":  "2026-11-07T16:08:04.860Z"
+                             },
+                             {
+                                 "name":  "sidebar-fts-off",
+                                 "pid":  46376,
+                                 "started":  "2026-11-07T16:09:40.966Z"
+                             },
+                             {
+                                 "name":  "sidebar-fts-off",
+                                 "pid":  46376,
+                                 "stopped":  "2026-11-07T16:09:49.079Z"
+                             }
+                         ],
+    "pidVerification":  [
+                            {
+                                "pid":  11032,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  15948,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  19796,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  20848,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  29488,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  34452,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  40884,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  41220,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  46376,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  52228,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  52848,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  53768,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  54436,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  58252,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  59376,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  60228,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  65220,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  70220,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  72692,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  75408,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  75664,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  78808,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  81088,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  87828,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  107596,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  109376,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  109684,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  109948,
+                                "running":  false,
+                                "processName":  null
+                            },
+                            {
+                                "pid":  114056,
+                                "running":  false,
+                                "processName":  null
+                            }
+                        ],
+    "remainingOwned":  [
+
+                       ],
+    "remainingListeners":  [
+
+                           ],
+    "note":  "All recorded PIDs absent. Browser processes close in finally. Forced host shutdown may produce launcher shell exit code 1; this is distinct from verifier result."
+}

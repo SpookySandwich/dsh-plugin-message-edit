@@ -1,0 +1,58 @@
+{
+  "source": "586e7e7206c42ab6d71953d80ac2025ae024a33c",
+  "checks": [
+    {
+      "name": "official default content search is disabled",
+      "preflight": {
+        "ok": false,
+        "error": {
+          "name": "RemoteError",
+          "message": "session search failed: SessionQueryError: session search is disabled: this deployment configures the session-query index with openAt \"never\"",
+          "code": "gateway/internal"
+        }
+      }
+    },
+    {
+      "name": "second restart restores nested edits and retry version markers"
+    },
+    {
+      "name": "shared-title FTS-off navigation remember=false",
+      "row": "Live: two images\nMessage Edit acceptance"
+    },
+    {
+      "name": "shared-title FTS-off navigation remember=true",
+      "row": "Live: two images\nMessage Edit acceptance"
+    },
+    {
+      "name": "unique hidden-title fallback opens child without full-text search"
+    },
+    {
+      "name": "ambiguous hidden-title behavior observed",
+      "remembered": "session-62c7330f-f0aa-4337-ab0d-77a24e6be754",
+      "chosen": "session-62c7330f-f0aa-4337-ab0d-77a24e6be754",
+      "rememberedSelected": true
+    },
+    {
+      "name": "ambiguous hidden-title behavior observed",
+      "remembered": "session-2bef9fa2-5045-4e9a-a288-403f712e7b84",
+      "chosen": "session-62c7330f-f0aa-4337-ab0d-77a24e6be754",
+      "rememberedSelected": false
+    },
+    {
+      "name": "grouping OFF default host has no content-only search results"
+    },
+    {
+      "name": "real plugin disposal restores native sidebar registration",
+      "before": "GroupedSidebar",
+      "after": "WorkspaceBrowser",
+      "childrenPreserved": true,
+      "storePreserved": true,
+      "styleRemoved": true
+    },
+    {
+      "name": "no page exceptions or HTTP errors"
+    }
+  ],
+  "errors": [],
+  "httpErrors": []
+}

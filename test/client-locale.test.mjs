@@ -31,11 +31,11 @@ function apply(locale) {
   return { dictionaries, specs, dispose() { disposers.reverse().forEach(fn => fn()); } };
 }
 
-test('all 37 locale keys and placeholder multisets match the English dictionary', () => {
+test('all 39 locale keys and placeholder multisets match the English dictionary', () => {
   const { dictionaries, dispose } = apply(createLocale());
   try {
     const keys = Object.keys(dictionaries.en).sort();
-    assert.equal(keys.length, 37);
+    assert.equal(keys.length, 39);
     const tokens = value => [...value.matchAll(/\{(\w+)\}/g)].map(match => match[1]).sort();
     for (const language of ['ru', 'zh']) {
       assert.deepEqual(Object.keys(dictionaries[language]).sort(), keys);

@@ -18,6 +18,7 @@ async function mount(t, content, renderMessageImages, options = {}) {
     url: 'https://message-edit.test/',
   });
   dom.window.localStorage.setItem('dsh-plugin-message-tree:style', options.style ?? 'chatgpt');
+  if (options.activePath) dom.window.localStorage.setItem('dsh-plugin-message-tree:active-path', JSON.stringify(options.activePath));
   dom.window.fetch = async () => ({ ok: true, json: async () => ({ versions: options.versions ?? [] }) });
   const previous = new Map();
   const browserErrors = [];
@@ -115,6 +116,25 @@ test('text and multiple images render through the host gallery in attachment ord
     assert.equal(call.images[1].attachment, second.attachment);
   }
   assert.deepEqual(content, before, 'Rendering must not rewrite message content');
+});
+
+test('reopening an original never unarchives its remembered child implicitly', async t => {
+  const opened = [];
+  await mount(t, [text('Original')], gallery([]), {
+    activePath: { 'session-test': 'archived-child' }, open: id => opened.push(id),
+    versions: [{ sessionId: 'session-test' }, { sessionId: 'archived-child', parentSessionId: 'session-test', archived: true }],
+  });
+  assert.deepEqual(opened, []);
+});
+
+test('native Quote and context-menu selection source is the message text, not its controls', async t => {
+  const doc = await mount(t, [text('Quote this prompt')], gallery([]));
+  const source = doc.querySelector('[data-text-interaction-source]');
+  assert.ok(source, 'DSH 0.2.2 text gestures require an explicit source');
+  assert.equal(source.textContent, 'Quote this prompt');
+  assert.equal(source.contains(doc.querySelector('.mtx-actions')), false);
+  await act(async () => doc.querySelector('[data-act="edit"]').click());
+  assert.equal(doc.querySelector('[data-text-interaction-source]'), null, 'Editing is not a transcript selection source');
 });
 
 test('an image-only message still displays its image', async t => {
