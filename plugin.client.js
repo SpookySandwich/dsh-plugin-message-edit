@@ -721,12 +721,15 @@ function imageCount(content) {
   return n;
 }
 
-function imageParts(content) {
+function attachmentParts(content) {
   if (!Array.isArray(content)) return [];
   const out = [];
   for (let i = 0; i < content.length; i++) {
     const block = content[i];
-    if (block && block.type === 'image' && block.attachment) out.push({ attachment: block.attachment });
+    if (block && block.attachment) {
+      if (block.type === 'image') out.push({ type: 'image', image: { attachment: block.attachment } });
+      else if (block.type === 'file') out.push({ type: 'file', file: block.attachment });
+    }
   }
   return out;
 }
@@ -1377,28 +1380,31 @@ return {
       }));
     }
 
-    function MessageImages({ images, count, loadImage, renderMessageImages, renderFactorySlot, sessionId }) {
-      if (!count) return null;
+    function MessageAttachments({ attachments, images, count, loadImage, renderMessageImages, renderFactorySlot, sessionId }) {
+      if (!count && !attachments.length) return null;
       const missing = count - images.length;
       const notice = missing > 0 ? React.createElement('span', { className: 'mtx-img', role: 'status' }, t('imageUnavailable')) : null;
+      const files = attachments.filter(function (part) { return part.type === 'file'; }).map(function (part, index) {
+        return React.createElement('span', { key: index, className: 'mtx-img' }, part.file.name);
+      });
+      const fallbackImages = !images.length ? null : typeof loadImage === 'function'
+        ? React.createElement('div', { className: 'mtx-thumbs' }, images.map(function (part, index) {
+          return React.createElement(ImageThumb, { key: index, attachment: part.attachment, loadImage });
+        }))
+        : React.createElement('div', { className: 'mtx-img' }, t('images', { count: images.length }));
+      const fallback = React.createElement(React.Fragment, null, fallbackImages, files);
       let gallery;
       if (images.length && typeof renderMessageImages === 'function') {
-        gallery = renderMessageImages({ images, align: 'end' });
-      } else if (images.length && typeof loadImage === 'function') {
-        const fallback = React.createElement('div', { className: 'mtx-thumbs' }, images.map(function (part, index) {
-          return React.createElement(ImageThumb, { key: index, attachment: part.attachment, loadImage });
-        }));
-        // DSH 0.2.1 owns its images child on this reusable content factory.
-        // Rendering that factory retains the native gallery/lightbox without
-        // declaring the already-owned conversation.chat.user.images slot again.
-        gallery = typeof renderFactorySlot === 'function'
-          ? renderFactorySlot('conversation.chat.user.content', {
-            content: { text: '', attachments: images.map(function (image) { return { type: 'image', image }; }), extraBlocks: [] },
-            loadImage,
-          }, { fallback })
-          : fallback;
-      } else if (images.length) {
-        gallery = React.createElement('div', { className: 'mtx-img' }, t('images', { count: images.length }));
+        gallery = React.createElement(React.Fragment, null, renderMessageImages({ images, align: 'end' }), files);
+      } else if (attachments.length && typeof renderFactorySlot === 'function'
+        && (!images.length || typeof loadImage === 'function')) {
+        // The host content factory owns image galleries and file cards. Imported
+        // file references may have no bytes, but their metadata still belongs here.
+        gallery = renderFactorySlot('conversation.chat.user.content', {
+          content: { text: '', attachments, extraBlocks: [] }, loadImage,
+        }, { fallback });
+      } else {
+        gallery = fallback;
       }
       return React.createElement(React.Fragment, { key: sessionId }, gallery, notice);
     }
@@ -1408,13 +1414,14 @@ return {
       const data = node.data || {};
       const text = contentText(data.content);
       const images = imageCount(data.content);
-      const messageImages = imageParts(data.content);
+      const attachments = attachmentParts(data.content);
+      const messageImages = attachments.filter(function (part) { return part.type === 'image'; }).map(function (part) { return part.image; });
       // The reusable host content factory owns an entire user-content stack,
       // including a percentage width limit. Give it the full row as its sizing
       // context, rather than nesting that stack inside our shrink-to-fit bubble.
-      const nativeImages = messageImages.length > 0
-        && typeof props.renderMessageImages !== 'function'
-        && typeof props.loadImage === 'function' && typeof props.renderFactorySlot === 'function';
+      const nativeAttachments = attachments.length > 0
+        && (!messageImages.length || typeof props.renderMessageImages !== 'function')
+        && (!messageImages.length || typeof props.loadImage === 'function') && typeof props.renderFactorySlot === 'function';
       const sessionId = props.sessionId !== undefined ? props.sessionId : (node.sessionId);
       // location.turn is a turn-group object ({turn, start, end, steps}); the
       // turn number lives one level down.
@@ -1602,17 +1609,17 @@ return {
         );
       }
 
-      const imageView = React.createElement(MessageImages, {
-        images: messageImages, count: images, sessionId,
+      const attachmentView = React.createElement(MessageAttachments, {
+        attachments, images: messageImages, count: images, sessionId,
         loadImage: props.loadImage, renderMessageImages: props.renderMessageImages,
         renderFactorySlot: props.renderFactorySlot,
       });
       return React.createElement('div', { className: 'mtx-row', 'data-turn': turn, 'data-session': sessionId },
-        nativeImages ? React.createElement('div', { className: 'mtx-native-images' }, imageView) : null,
-        !nativeImages || text ? React.createElement('div', { className: 'mtx-line' },
+        nativeAttachments ? React.createElement('div', { className: 'mtx-native-images' }, attachmentView) : null,
+        !nativeAttachments || text ? React.createElement('div', { className: 'mtx-line' },
           React.createElement('div', { className: 'mtx-bubble', 'data-text-interaction-source': text ? '' : undefined },
             text,
-            nativeImages ? null : imageView
+            nativeAttachments ? null : attachmentView
           )
         ) : null,
         // The controls sit under the bubble in all three references. Which

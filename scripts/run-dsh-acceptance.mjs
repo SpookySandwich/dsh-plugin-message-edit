@@ -4,12 +4,14 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtemp, mkdir, symlink, writeFile, copyFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 assert.ok(process.env.DSH_QA_MODULES, 'Set DSH_QA_MODULES to an installed official @deepseek-ai/dsh node_modules directory');
 const modules = resolve(process.env.DSH_QA_MODULES);
 const runtime = JSON.parse(await readFile(join(modules, '@deepseek-ai/dsh/package.json'), 'utf8'));
+const chatImport = existsSync(join(modules, '@deepseek-ai/dsh-deepseek-chat-import/package.json'));
 const home = await mkdtemp(join(tmpdir(), 'message-edit-dsh-qa-'));
 const profile = join(home, 'profiles', 'web');
 let server;
@@ -26,10 +28,12 @@ try {
   await symlink(join(modules, '@deepseek-ai'), join(profile, 'node_modules', '@deepseek-ai'), 'junction');
   await symlink(root, join(profile, 'node_modules', 'dsh-plugin-message-edit'), 'junction');
   await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'message-edit-qa', private: true,
-    dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-plugin-message-edit'] } } }));
+    dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-plugin-message-edit',
+      ...(chatImport ? ['@deepseek-ai/dsh-deepseek-chat-import'] : [])] } } }));
   // A fixture is a separate host-only entry, not a second client package source.
   await copyFile(join(root, 'test/fixtures/dsh-acceptance.mjs'), join(profile, 'fixture.mjs'));
-  await writeFile(join(profile, 'cordis.patch.yml'), '- insert:\n    - id: offline-qa\n      name: ./fixture.mjs\n');
+  await writeFile(join(profile, 'cordis.patch.yml'), '- insert:\n    - id: offline-qa\n      name: ./fixture.mjs\n' +
+    '- id: agent-default-model\n  config:\n    provider: qa-local\n    model: qa-model\n    reasoningEffort: high\n');
   for (const phase of ['fresh', 'restart']) {
     let output = '';
     server = spawn(process.execPath, ['--expose-internals', join(modules, '@deepseek-ai/dsh/lib/bin.js'),
@@ -48,7 +52,9 @@ try {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     console.log(`Official DSH ${runtime.version} acceptance: ${phase}; pid=${server.pid}; home=${home}; origin=${origin}`);
-    const verifier = spawn(process.execPath, [join(root, 'scripts/verify-dsh-acceptance.mjs'), origin, phase], {
+    const launchUrl = output.match(/http:\/\/127\.0\.0\.1:\d+\/\?[^\s\x1b]+/)?.[0] ?? origin;
+    const verifier = spawn(process.execPath, [join(root, 'scripts/verify-dsh-acceptance.mjs'), origin, phase, launchUrl], {
+      env: { ...process.env, DSH_QA_IMPORT: chatImport ? '1' : '0' },
       stdio: 'inherit', windowsHide: true,
     });
     const timeout = setTimeout(() => verifier.kill(), 60000);

@@ -105,7 +105,9 @@ export async function apply(ctx, config = {}) {
       } finally { observation[Symbol.dispose](); }
     }));
     res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({ sessions }));
+    res.end(JSON.stringify({ sessions, workspaces: ctx.workspaceRegistry.list().map(workspace => ({
+      id: workspace.id, path: workspace.path, sessionIds: workspace.sessionIds,
+    })) }));
     } catch (error) {
       console.error('QA state failed:', error);
       res.writeHead(500, { 'content-type': 'application/json' });

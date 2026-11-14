@@ -5,7 +5,7 @@
 [![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
 [![CI](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.1-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.3-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 编辑一条已经发出的消息，对话会从那一刻 **真正回溯并分叉**——和 ChatGPT、Claude、DeepSeek 的做法一致。旧版本不会被覆盖：气泡下方出现 `‹ 2/4 ›` 计数，「版本」标签页则画出整棵树。
@@ -86,7 +86,9 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
-版本 `1.6.0`（当前源码）：新增可选的「侧栏同一对话只显示一个入口」版本合并功能（[#12](https://github.com/SpookySandwich/dsh-plugin-message-edit/pull/12)，由 [@ganpig](https://github.com/ganpig) 贡献），并支持官方 DSH `0.2.2-rc.1`（上游标签 `dsh-v0.2.2-rc.1`，提交 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`），同时保持对 `0.2.0-rc.2`、`0.2.1-rc.2` 与 `0.2.1-rc.5` 的兼容支持。声明的宿主兼容范围（`peerDependencies` 与 `engines.dsh`）显式纳入 `0.2.2-rc.1`（`>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1`）。官方 DSH `0.2.2-rc.1` 要求 Node `>=24.9.0`，本插件对旧版受支持 DSH 宿主继续保持 Node `22.19+` 与 Node `24` 兼容，未在 `package.json` 中额外抬高全局 Node 版本下限。包含按记录谱系合并侧栏入口（默认关闭）、根会话工作区/置顶/归档归属保持、家族运行状态与子智能体计数聚合、待处理与未读状态优先跳转（`approval`/`plan-review`/`question` → 未读完成 → 记住的版本/根会话兜底，按实际打开会话逐个确认已读）、显式搜索摘要命中跳转、流式输出期间稳定的搜索回调、DSH `0.2.2` 用户消息正文选择引用（Quote）标记，以及浅色主题下版本卡片与控件背景对比度修复（`--dsw-alias-bg-base`）。已完成 102 项自动化测试、发布与打包校验、官方 `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5` 与 `0.2.2-rc.1` 四版本全新启动与重启恢复 API 验收，以及官方 `0.2.2-rc.1` 与 `0.2.1-rc.5` 真实浏览器隔离 Web 验收。
+版本 `1.6.1`（当前源码）：支持官方 DSH `0.2.2-rc.3`。编辑或重试没有活动智能体的导入历史时，若日志中不存在 `request/header`，则使用 DSH 当前默认模型；原生历史仍沿用已记录的模型与控制选项。源会话没有记录智能体预设时，分支会解析并挂载 DSH 配置的默认预设，保留其角色设定、指令与工具；导入会话追加原生轮次后同样适用。原生和导入消息中的文件卡片（包括仅有元数据的文件）与图片一起交由宿主内容渲染器显示。兼容范围显式纳入 `0.2.2-rc.3`，继续排除尚未验证的 `0.2.2-rc.2` 与后续预发布版本。
+
+版本 `1.6.0`：新增可选的「侧栏同一对话只显示一个入口」版本合并功能（[#12](https://github.com/SpookySandwich/dsh-plugin-message-edit/pull/12)，由 [@ganpig](https://github.com/ganpig) 贡献），并支持官方 DSH `0.2.2-rc.1`（上游标签 `dsh-v0.2.2-rc.1`，提交 `66491b05e3f05ad35bcdd4f6cd7ed26041d9e3db`），同时保持对 `0.2.0-rc.2`、`0.2.1-rc.2` 与 `0.2.1-rc.5` 的兼容支持。声明的宿主兼容范围（`peerDependencies` 与 `engines.dsh`）显式纳入 `0.2.2-rc.1`（`>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1`）。官方 DSH `0.2.2-rc.1` 要求 Node `>=24.9.0`，本插件对旧版受支持 DSH 宿主继续保持 Node `22.19+` 与 Node `24` 兼容，未在 `package.json` 中额外抬高全局 Node 版本下限。包含按记录谱系合并侧栏入口（默认关闭）、根会话工作区/置顶/归档归属保持、家族运行状态与子智能体计数聚合、待处理与未读状态优先跳转（`approval`/`plan-review`/`question` → 未读完成 → 记住的版本/根会话兜底，按实际打开会话逐个确认已读）、显式搜索摘要命中跳转、流式输出期间稳定的搜索回调、DSH `0.2.2` 用户消息正文选择引用（Quote）标记，以及浅色主题下版本卡片与控件背景对比度修复（`--dsw-alias-bg-base`）。已完成 102 项自动化测试、发布与打包校验、官方 `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5` 与 `0.2.2-rc.1` 四版本全新启动与重启恢复 API 验收，以及官方 `0.2.2-rc.1` 与 `0.2.1-rc.5` 真实浏览器隔离 Web 验收。
 
 版本 `1.5.0`：支持官方 DSH `0.2.1-rc.5`，同时保持对 `0.2.0-rc.2` 与 `0.2.1-rc.2` 的兼容支持。声明的宿主兼容范围（`peerDependencies` 与 `engines.dsh`）显式纳入 `0.2.1-rc.5`（`>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5`）。在官方 `0.2.0-rc.2`、`0.2.1-rc.2` 与 `0.2.1-rc.5` 运行时上完成全新启动与重启恢复验证，涵盖多图消息编辑、版本导航、重试分叉以及 400px 窄屏 More 菜单导航。
 
@@ -104,13 +106,13 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 版本 `1.1.0`：修复编辑/重试的 seed 边界，发布分支前清空继承的待发送输入，按会话身份识别版本标记，保留推理强度，并通过会话观察接口恢复持久分支。
 
-声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1`；官方 dsh `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5` 与 `0.2.2-rc.1` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/pr12-round2-actionable-status-2026-11-07.md)（[运行时矩阵](.github/reviews/pr12-current-runtime-2026-11-07.md)）。
+声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.3`；官方 dsh `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5`、`0.2.2-rc.1` 与 `0.2.2-rc.3` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/pr12-round2-actionable-status-2026-11-07.md)（[运行时矩阵](.github/reviews/pr12-current-runtime-2026-11-07.md)）。
 
-已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.6.0.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
+已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.6.1.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
 
 `1.1.0` 已在 DSH `0.1.5-rc.2` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
 
-兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。本版本对应官方 dsh `0.2.2-rc.1`。更新插件后请重启 DSH。
+兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。当前源码对应官方 dsh `0.2.2-rc.3`。更新插件后请重启 DSH。
 
 可与 [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream)、[dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout) 共存。
 

@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir, symlink, writeFile, copyFile, readFile, appendFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 
 const root = resolve(import.meta.dirname, '..');
 assert.ok(process.env.DSH_QA_MODULES && process.env.DSH_QA_HOME);
 const modules = resolve(process.env.DSH_QA_MODULES);
+const chatImport = existsSync(join(modules, '@deepseek-ai/dsh-deepseek-chat-import/package.json'));
 const home = resolve(process.env.DSH_QA_HOME);
 assert.match(home, /[\\/]message-edit-dsh-qa-[^\\/]+$/);
 const profile = join(home, 'profiles', 'web');
@@ -16,10 +18,12 @@ for (const [source, name] of [[join(modules, '@deepseek-ai'), '@deepseek-ai'], [
   catch (error) { if (error.code !== 'EEXIST') throw error; }
 }
 await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'message-edit-browser-qa', private: true,
-  dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-plugin-message-edit'] } } }));
+  dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-plugin-message-edit',
+    ...(chatImport ? ['@deepseek-ai/dsh-deepseek-chat-import'] : [])] } } }));
 for (const name of ['dsh-acceptance.mjs', 'dsh-browser-acceptance.mjs'])
   await copyFile(join(root, 'test/fixtures', name), join(profile, name));
 await writeFile(join(profile, 'cordis.patch.yml'), '- insert:\n    - id: offline-qa\n      name: ./dsh-browser-acceptance.mjs\n' +
+  '- id: agent-default-model\n  config:\n    provider: qa-local\n    model: qa-model\n    reasoningEffort: max\n' +
   (process.env.DSH_QA_FTS === 'off' ? '' : '- id: session-query-sqlite\n  config:\n    path: ":memory:"\n    openAt: first-search\n'));
 const runtime = JSON.parse(await readFile(join(modules, '@deepseek-ai/dsh/package.json'), 'utf8'));
 const server = spawn(process.execPath, ['--expose-internals', join(modules, '@deepseek-ai/dsh/lib/bin.js'),

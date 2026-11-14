@@ -2,12 +2,14 @@
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { deepseekExportEntries } from '../test/fixtures/deepseek-export.mjs';
 import { launchQA, settleTree } from './browser-qa-utils.mjs';
 
 const qa = await launchQA('sidebar-current');
 const { page, out, origin } = qa;
 const host = JSON.parse(await readFile(join(qa.home, 'process.json'), 'utf8')).version;
-const nativeIdSearch = host === '0.2.2-rc.1';
+const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3'].includes(host);
 const evidence = { source: process.env.DSH_QA_SHA, host, browser: qa.browser.version(), checks: [], errors: qa.errors, httpErrors: qa.httpErrors };
 const rows = () => page.locator('[class*="_searchResultRow"]');
 const row = id => page.locator(`[data-row-key="session:${id}"]`);
@@ -39,7 +41,7 @@ async function prefs(foldSidebar, rememberPath) {
     return [p.foldSidebar, p.rememberPath];
   }), [foldSidebar, rememberPath]);
 }
-async function edit(text, index = 0) {
+async function edit(text, index = 0, images = 2) {
   await page.getByRole('button', { name: 'Edit message', exact: true }).nth(index).click();
   await page.locator('textarea').fill(text);
   const response = page.waitForResponse(r => r.url().endsWith('/message-tree') && r.request().method() === 'POST');
@@ -47,7 +49,7 @@ async function edit(text, index = 0) {
   const result = await (await response).json();
   assert.ok(result.sessionId, JSON.stringify(result));
   await page.waitForFunction(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id]?.retainedBy?.mainView > 0, result.sessionId);
-  await page.getByText('Local QA reply. Received 2 images.', { exact: true }).first().waitFor();
+  await page.getByText(`Local QA reply. Received ${images} images.`, { exact: true }).first().waitFor();
   await page.waitForFunction(() => !window.__qa.ctx.get('sessions').list.getSnapshot().ids.some(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id].running));
   return result.sessionId;
 }
@@ -132,6 +134,7 @@ try {
     const result = await sessions.manager.rename(id, 'HiddenOnlyLarch');
     if (result.error) throw new Error(JSON.stringify(result));
   }, child);
+  await page.waitForFunction(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id]?.title === 'HiddenOnlyLarch', child);
   await prefs(true, true);
   await open(sibling);
   await hit('HiddenOnlyLarch', 'Live: two images', child);
@@ -174,6 +177,49 @@ try {
   await checkpoint('Versions tree renders grouped family');
   await writeFile(join(out, 'family.json'), JSON.stringify(evidence.family, null, 2));
   await qa.context.storageState({ path: join(out, 'browser-storage.json') });
+  if (host === '0.2.2-rc.3') {
+    const require = createRequire(join(process.env.DSH_QA_MODULES, 'package.json'));
+    const { zipSync } = require('fflate');
+    const image = await require('sharp')({ create: { width: 8, height: 8, channels: 3, background: 'red' } }).png().toBuffer();
+    await page.getByRole('button', { name: 'Import DeepSeek chats', exact: true }).click();
+    await page.getByLabel('Export file', { exact: true }).setInputFiles({ name: 'deepseek_data-qa.zip', mimeType: 'application/zip',
+      buffer: Buffer.from(zipSync(deepseekExportEntries(image))) });
+    await page.getByRole('dialog', { name: 'Import DeepSeek chat history' })
+      .getByRole('button', { name: 'Message Edit acceptance', exact: true }).waitFor();
+    const uploaded = page.waitForResponse(response => response.url().includes('/api/deepseek-chat-import/archive?')
+      && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Import', exact: true }).click();
+    const progress = (await (await uploaded).text()).trim().split('\n').map(line => JSON.parse(line));
+    const importedId = progress.find(line => line.type === 'outcome')?.outcome?.value?.sessionIds[0];
+    assert.ok(importedId, JSON.stringify(progress));
+    await page.getByText('Imported 1 session into the Message Edit acceptance workspace.', { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    const state = await (await fetch(`${origin}/qa/state`)).json();
+    const imported = state.sessions.find(s => s.header.id === importedId);
+    assert.ok(imported);
+    assert.equal(imported.live, false);
+    assert.equal(imported.events.some(e => e.type === 'request/header'), false);
+    await row(imported.header.id).click();
+    await page.getByText('Imported first prompt', { exact: true }).waitFor();
+    await page.getByText('unavailable.txt', { exact: true }).first().waitFor();
+    await page.getByText('Imported answer with a web result.', { exact: true }).waitFor();
+    assert.equal(await page.getByText('Unselected original DeepSeek branch', { exact: true }).count(), 0);
+    await page.waitForFunction(() => [...document.querySelectorAll('.mtx-row img')].filter(e => e.complete && e.naturalWidth > 0).length === 2);
+    await checkpoint('import dialog refreshes sidebar and opens settled tool/image/error history');
+    const importedChild = await edit('Edited imported error prompt', 1, 1);
+    assert.equal(await row(importedChild).count(), 0);
+    assert.equal(await row(imported.header.id).getAttribute('aria-selected'), 'true');
+    await page.getByRole('tab', { name: 'Versions', exact: true }).click();
+    await settleTree(page);
+    await page.screenshot({ path: join(out, 'imported-versions-wide.png') });
+    await open(importedChild);
+    await page.getByRole('button', { name: '‹', exact: true }).last().click();
+    await page.waitForFunction(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id]?.retainedBy?.mainView > 0, imported.header.id);
+    await page.getByText('Imported error prompt', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '›', exact: true }).last().click();
+    await page.waitForFunction(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id]?.retainedBy?.mainView > 0, importedChild);
+    await checkpoint('imported UI edit, workspace grouping, tree and version switching', { root: imported.header.id, child: importedChild });
+  }
   assert.deepEqual(qa.errors, []);
   assert.deepEqual(qa.httpErrors, []);
   await checkpoint('no page exceptions or HTTP errors');

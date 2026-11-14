@@ -5,13 +5,14 @@ import { apply } from '../lib/index.js';
 
 // Exercise the public HTTP route with both documented DSH session shapes.
 // Lifecycle/model execution is a double; real-runtime acceptance is separate.
-function harness(modern, resumed = false) {
+function harness(modern, resumed = false, { imported = false, defaultSelection, agentPresets } = {}) {
   const records = new Map();
   const agents = new Map();
   const creations = [];
   const attached = [];
   let reads = 0;
   let resumes = 0;
+  let defaultReads = 0;
   let route;
   function makeSession(id, events, meta = {}, inheritedEventCount = 0) {
     const header = { id, createdAt: 1, cwd: '/qa', ...meta };
@@ -45,7 +46,7 @@ function harness(modern, resumed = false) {
     return agent;
   }
   const root = makeSession('source', []);
-  append(root, 'request/header', { header: { config: { provider: 'qa', model: 'qa', reasoningEffort: 'max' } } });
+  if (!imported) append(root, 'request/header', { header: { config: { provider: 'qa', model: 'qa', reasoningEffort: 'max' } } });
   const originalImage = { type: 'image', attachment: { attachmentId: 'sha256:qa-image' } };
   const prompt = value => ({ id: `message-${value}`, role: 'user', source: { kind: 'user' }, content: [
     { type: 'text', text: value }, structuredClone(originalImage),
@@ -63,6 +64,10 @@ function harness(modern, resumed = false) {
       flush: async () => {},
     },
     sessionPersistence: {},
+    agentPresets,
+    agentDefaultModel: defaultSelection === undefined ? undefined : {
+      currentSelection() { defaultReads++; return structuredClone(defaultSelection); },
+    },
     workspaceRegistry: {
       archivedSessionIds: [],
       list: () => [{ sessionIds: [...records.keys()], attachSession: async id => attached.push(id) }],
@@ -119,7 +124,111 @@ function harness(modern, resumed = false) {
     return { status, body: payload };
   }
   return { request, records, agents, creations, attached, prompt, append,
-    get reads() { return reads; }, get resumes() { return resumes; } };
+    get reads() { return reads; }, get resumes() { return resumes; }, get defaultReads() { return defaultReads; } };
+}
+
+const defaultSelection = { provider: 'default-provider', model: 'default-model', reasoningEffort: 'high' };
+for (const modern of [false, true]) {
+  for (const state of ['cold', 'live', 'continued']) {
+    test(`${modern ? 'modern' : 'legacy'} imported ${state} history resolves, mounts and records the configured default preset`, async () => {
+      const resolved = [], mounted = [];
+      const h = harness(modern, state === 'cold', { imported: true, defaultSelection, agentPresets: {
+        async resolve(id) { resolved.push(id); return { id: id ?? 'configured-default' }; },
+        async mount(agentCtx, id) { assert.ok(agentCtx); mounted.push(id); },
+      } });
+      if (state === 'continued') {
+        h.append(h.records.get('source'), 'request/header', { header: { config: { provider: 'qa', model: 'qa' } } });
+        h.agents.get('source').followup(h.prompt('native continuation'));
+      }
+      const source = h.records.get('source');
+      const original = source.events.findLast(event => event.type === 'user/message');
+      const turn = source.events.findLast(event => event.type === 'turn/start').data.turn;
+      for (const action of ['edit', 'retry']) {
+        const result = await h.request('POST', { action, sessionId: 'source', turn, eventSeq: original.seq,
+          blockIndex: 0, text: 'edited with default preset' });
+        assert.equal(result.status, 200, JSON.stringify(result.body));
+        assert.equal(h.records.get(result.body.sessionId).session.header.agentPreset, 'configured-default');
+        assert.equal(h.creations.at(-1).meta.agentPreset, 'configured-default');
+      }
+      assert.deepEqual(resolved, [undefined, undefined], 'The service must choose its configured default');
+      assert.deepEqual(mounted, ['configured-default', 'configured-default']);
+      assert.equal(source.session.header.agentPreset, undefined, 'Do not rewrite the imported header');
+    });
+  }
+}
+
+for (const selected of [false, true]) {
+  test(`a preset recorded in the ${selected ? 'selection event' : 'header'} takes precedence over the default`, async () => {
+    const resolved = [], mounted = [];
+    const h = harness(true, true, { agentPresets: {
+      async resolve(id) { resolved.push(id); return { id: id ?? 'configured-default' }; },
+      async mount(agentCtx, id) { assert.ok(agentCtx); mounted.push(id); },
+    } });
+    h.records.get('source').session.header.agentPreset = 'recorded-preset';
+    if (selected) h.append(h.records.get('source'), 'agent-preset/selected', { agentPreset: 'selected-preset' });
+    const expected = selected ? 'selected-preset' : 'recorded-preset';
+    const result = await h.request('POST', { action: 'retry', sessionId: 'source', turn: 1 });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.deepEqual(resolved, [expected]);
+    assert.deepEqual(mounted, [expected]);
+    assert.equal(h.creations[0].meta.agentPreset, expected);
+  });
+}
+
+for (const resumed of [false, true]) {
+  for (const action of ['edit', 'retry']) {
+    test(`imported ${resumed ? 'cold' : 'observed'} history: ${action} uses the host default without a live agent`, async () => {
+      const h = harness(true, resumed, { imported: true, defaultSelection });
+      h.agents.delete('source');
+      const before = structuredClone(h.records.get('source').events);
+      const result = await h.request('POST', { action, sessionId: 'source', eventSeq: 1, blockIndex: 0,
+        text: 'edited import', turn: 1 });
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      assert.equal(h.resumes, 1);
+      assert.equal(h.defaultReads, 1);
+      assert.equal(h.agents.has('source'), false, 'The temporary source agent is released');
+      assert.deepEqual(h.creations[0].agentOptions, defaultSelection);
+      const child = h.records.get(result.body.sessionId);
+      assert.equal(child.events[0].type, 'message-tree/version', 'Editing the first imported turn has an empty inherited prefix');
+      assert.equal(child.session.inheritedEventCount, 1);
+      const message = child.events.findLast(event => event.type === 'user/message').data;
+      assert.equal(message.content[0].text, action === 'edit' ? 'edited import' : 'original');
+      assert.deepEqual(message.content[1], before[1].data.content[1]);
+      assert.deepEqual(h.records.get('source').events, before);
+      assert.deepEqual(h.attached, [child.session.id]);
+      const tree = await h.request('GET', undefined, child.session.id);
+      assert.equal(tree.status, 200, JSON.stringify(tree.body));
+      assert.equal(tree.body.versions.length, 2);
+      assert.equal(tree.body.versions.find(version => version.sessionId === child.session.id).targetTurn, 1);
+    });
+  }
+}
+
+test('imported live agent keeps its options instead of the host default', async () => {
+  const h = harness(true, false, { imported: true, defaultSelection });
+  const result = await h.request('POST', { action: 'retry', sessionId: 'source', turn: 1 });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(h.creations[0].agentOptions, { provider: 'qa', model: 'qa' });
+  assert.equal(h.defaultReads, 0);
+});
+
+test('native cold history keeps its recorded route and controls instead of host defaults', async () => {
+  const h = harness(true, true, { defaultSelection });
+  const result = await h.request('POST', { action: 'retry', sessionId: 'source', turn: 1 });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.deepEqual(h.creations[0].agentOptions, { provider: 'qa', model: 'qa', reasoningEffort: 'max' });
+  assert.equal(h.defaultReads, 0);
+});
+
+for (const selection of [undefined, { provider: '', model: '' }]) {
+  test(`imported history rejects an ${selection ? 'empty' : 'unavailable'} default route before resuming`, async () => {
+    const h = harness(true, true, { imported: true, defaultSelection: selection });
+    const result = await h.request('POST', { action: 'retry', sessionId: 'source', turn: 1 });
+    assert.equal(result.status, 409);
+    assert.match(result.body.error, /模型路由/);
+    assert.equal(h.resumes, 0);
+    assert.equal(h.creations.length, 0);
+  });
 }
 
 for (const modern of [false, true]) {

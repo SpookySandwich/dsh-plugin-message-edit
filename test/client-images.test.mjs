@@ -201,6 +201,45 @@ test('legacy gallery takes precedence over the factory and loader', async t => {
   assert.equal(doc.querySelector('.mtx-native-images'), null);
 });
 
+test('imported file cards and images reach the native factory in attachment order', async t => {
+  const file = { type: 'file', attachment: { attachmentId: `sha256:${'a'.repeat(64)}`, name: 'unavailable.txt', mediaType: 'text/plain', bytes: 4 } };
+  const image = photo('imported');
+  const content = [text('Imported prompt'), file, image];
+  const before = structuredClone(content);
+  const calls = [];
+  const doc = await mount(t, content, undefined, { props: {
+    loadImage: () => '/imported.png',
+    renderFactorySlot(name, props, options) { calls.push({ name, props }); return options.fallback; },
+  } });
+  assert.match(doc.body.textContent, /unavailable\.txt/);
+  assert.equal(doc.querySelector('img')?.alt, 'imported.png');
+  for (const { name, props } of calls) {
+    assert.equal(name, 'conversation.chat.user.content');
+    assert.equal(props.content.attachments[0].file, file.attachment);
+    assert.equal(props.content.attachments[1].image.attachment, image.attachment);
+  }
+  assert.ok(calls.length);
+  assert.deepEqual(content, before);
+  await act(async () => doc.querySelector('[data-act="edit"]').click());
+  await act(async () => [...doc.querySelectorAll('button')].find(button => button.textContent === 'Cancel').click());
+  assert.match(doc.body.textContent, /unavailable\.txt/);
+});
+
+test('a file-only message uses the native factory without an image loader', async t => {
+  const file = { type: 'file', attachment: { name: 'metadata-only.txt' } };
+  let rendered = false;
+  const doc = await mount(t, [file], undefined, { props: {
+    renderFactorySlot(_name, props, options) {
+      rendered = true;
+      assert.equal(props.content.attachments[0].file, file.attachment);
+      return options.fallback;
+    },
+  } });
+  assert.ok(rendered);
+  assert.match(doc.body.textContent, /metadata-only\.txt/);
+  assert.equal(doc.querySelector('.mtx-bubble'), null);
+});
+
 test('native factory content sits above the text bubble in the full message row', async t => {
   const doc = await mount(t, [text('Caption'), photo('native')], undefined, { props: {
     loadImage: async () => '/native.png',
