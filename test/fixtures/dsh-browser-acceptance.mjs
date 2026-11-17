@@ -67,10 +67,10 @@ export async function apply(ctx) {
         await workspace[action === 'detach-root' ? 'detachSession' : 'attachSession'](sessionId);
         result = { workspaceId: workspace.id };
       } else if (action === 'subagent') {
+        const request = { parent, prompt: [{ type: 'text', text: 'QA_STREAM_subagent fixture' }],
+          agentOptions: { provider: 'qa-local', model: 'qa-model' } };
         const activation = await ctx.subagents.startActivation({ provider: 'spawn', label: 'QA hidden-child subagent',
-          request: { parent, prompt: [{ type: 'text', text: 'QA_STREAM_subagent fixture' }],
-            agentOptions: { provider: 'qa-local', model: 'qa-model' } },
-          signal: new AbortController().signal, delivery: 'caller' });
+          ...request, request, signal: new AbortController().signal, delivery: 'caller' });
         const record = { childId: activation.childId, settled: false };
         activations.set(activation.childId, record);
         activation.result.then(result => { record.settled = true; record.result = result; }, error => { record.error = String(error); });

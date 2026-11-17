@@ -9,7 +9,7 @@ import { launchQA, settleTree } from './browser-qa-utils.mjs';
 const qa = await launchQA('sidebar-current');
 const { page, out, origin } = qa;
 const host = JSON.parse(await readFile(join(qa.home, 'process.json'), 'utf8')).version;
-const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3'].includes(host);
+const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.4'].includes(host);
 const evidence = { source: process.env.DSH_QA_SHA, host, browser: qa.browser.version(), checks: [], errors: qa.errors, httpErrors: qa.httpErrors };
 const rows = () => page.locator('[class*="_searchResultRow"]');
 const row = id => page.locator(`[data-row-key="session:${id}"]`);
@@ -177,7 +177,7 @@ try {
   await checkpoint('Versions tree renders grouped family');
   await writeFile(join(out, 'family.json'), JSON.stringify(evidence.family, null, 2));
   await qa.context.storageState({ path: join(out, 'browser-storage.json') });
-  if (host === '0.2.2-rc.3') {
+  if (['0.2.2-rc.3', '0.2.2-rc.4'].includes(host)) {
     const require = createRequire(join(process.env.DSH_QA_MODULES, 'package.json'));
     const { zipSync } = require('fflate');
     const image = await require('sharp')({ create: { width: 8, height: 8, channels: 3, background: 'red' } }).png().toBuffer();
