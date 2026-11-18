@@ -127,6 +127,18 @@ export async function apply(ctx, config = {}) {
     res.writeHead(200, { 'content-type': 'application/json' });
     res.end('{}');
   } });
+  ctx.webServer.register({ kind: 'exact', path: '/qa/team', handler: async (req, res) => {
+    if (!localRequest(req, res, 'POST')) return;
+    const teams = ctx.get('agentTeams');
+    if (typeof teams?.setEnabled !== 'function') { res.writeHead(404); res.end('{}'); return; }
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const agent = ctx.agents.get(JSON.parse(body).sessionId);
+    assert.equal(agent?.session.header.cwd, cwd, 'Only this disposable fixture workspace may be changed');
+    await teams.setEnabled(agent, true);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end('{}');
+  } });
   ctx.webServer.register({ kind: 'exact', path: '/qa/image-only', handler: async (req, res) => {
     if (!localRequest(req, res, 'POST')) return;
     let body = '';

@@ -22,17 +22,31 @@ async function post(body) {
   assert.equal(response.status, 200, JSON.stringify(result));
   return result;
 }
+const team = await fetch(`${base}/qa/team`, { method: 'POST', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ sessionId: 'session-qa-live' }) });
+const teamHost = team.status === 200;
+const teamMode = session => session.events.findLast(event => event.type === 'team/mode'
+  && event.seq >= session.inheritedEventCount)?.data.enabled === true;
+async function assertTeamModeCarried(sourceId, childId) {
+  if (!teamHost) return;
+  const { sessions } = await state();
+  const [source, child] = [sourceId, childId].map(id => sessions.find(session => session.header.id === id));
+  assert.equal(teamMode(child), teamMode(source), `Branch ${childId} must keep the Team mode of ${sourceId}`);
+}
 const before = await state();
 const isUser = event => event.type === 'user/message' && event.data.source.kind === 'user';
 // On the second invocation this must resume an already persisted seeded child,
 // not only read its log while creating another child from an unseeded root.
-const persistedBranch = before.sessions.find(session => session.header.isSeeded && !session.live
+const persistedBranches = before.sessions.filter(session => session.header.isSeeded && !session.live
   && session.events.some(event => event.type === 'message-tree/version' && event.data.sessionId === session.header.id));
+const persistedBranch = persistedBranches.find(teamMode) ?? persistedBranches[0];
 if (phase === 'restart') assert.ok(persistedBranch, 'Restart must restore a previously persisted seeded branch');
+if (phase === 'restart' && teamHost) assert.ok(teamMode(persistedBranch), 'A branch keeps its Team mode across restart');
 if (phase === 'fresh') assert.equal(persistedBranch, undefined, 'Fresh acceptance must start without old branches');
 if (persistedBranch) {
   const marker = persistedBranch.events.find(event => event.type === 'message-tree/version' && event.data.sessionId === persistedBranch.header.id);
-  await post({ action: 'retry', sessionId: persistedBranch.header.id, turn: marker.data.effect.targetTurn });
+  const retried = await post({ action: 'retry', sessionId: persistedBranch.header.id, turn: marker.data.effect.targetTurn });
+  await assertTeamModeCarried(persistedBranch.header.id, retried.sessionId);
   console.log('Persisted seeded branch resumed and retried successfully.');
 }
 for (const id of ['session-qa-live', 'session-qa-cold']) {
@@ -58,6 +72,7 @@ for (const id of ['session-qa-live', 'session-qa-cold']) {
   const preserved = after.sessions.find(session => session.header.id === id).events;
   assert.deepEqual(preserved.slice(0, source.events.length), source.events);
   assert.equal(preserved.filter(isUser).length, 2);
+  await assertTeamModeCarried(id, result.sessionId);
   const treeResponse = await fetch(`${base}/message-tree?sessionId=${result.sessionId}`);
   assert.equal(treeResponse.status, 200);
   const tree = await treeResponse.json();
@@ -79,7 +94,8 @@ for (const id of ['session-qa-live', 'session-qa-cold']) {
   const nestedVersion = nestedTree.versions.find(version => version.sessionId === nested.sessionId);
   assert.equal(nestedVersion.targetTurn, 2, 'The inherited turn-1 marker must not hide the new turn-2 marker');
   assert.equal(nestedVersion.parentSessionId, result.sessionId);
-  console.log(JSON.stringify({ source: id, sourceWasLive: source.live, child: result.sessionId,
+  await assertTeamModeCarried(result.sessionId, nested.sessionId);
+  console.log(JSON.stringify({ source: id, sourceWasLive: source.live, child: result.sessionId, teamMode: teamHost && teamMode(source),
     result: 'edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed' }));
 }
 

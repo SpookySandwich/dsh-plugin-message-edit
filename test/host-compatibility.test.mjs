@@ -5,7 +5,7 @@ import { apply } from '../lib/index.js';
 
 // Exercise the public HTTP route with both documented DSH session shapes.
 // Lifecycle/model execution is a double; real-runtime acceptance is separate.
-function harness(modern, resumed = false, { imported = false, defaultSelection, agentPresets } = {}) {
+function harness(modern, resumed = false, { imported = false, defaultSelection, agentPresets, agentTeams } = {}) {
   const records = new Map();
   const agents = new Map();
   const creations = [];
@@ -65,6 +65,7 @@ function harness(modern, resumed = false, { imported = false, defaultSelection, 
     },
     sessionPersistence: {},
     agentPresets,
+    agentTeams,
     agentDefaultModel: defaultSelection === undefined ? undefined : {
       currentSelection() { defaultReads++; return structuredClone(defaultSelection); },
     },
@@ -279,6 +280,48 @@ for (const modern of [false, true]) {
     assert.equal(d.events.findLast(event => event.type === 'user/message').data.content[0].text, 'C');
   });
 }
+
+for (const enabled of [false, true]) {
+  test(`edit and retry carry the source's Team mode (${enabled ? 'on' : 'off'}) into the branch before its turn`, async () => {
+    let h;
+    const mode = agent => {
+      const { events, session } = h.records.get(agent.session.id);
+      return events.findLast(event => event.type === 'team/mode' && event.seq >= session.inheritedEventCount)?.data.enabled === true;
+    };
+    h = harness(true, false, { agentTeams: {
+      isEnabled: mode,
+      async setEnabled(agent, value) {
+        assert.notEqual(agent.session.id, 'source', 'The original log is never written');
+        if (mode(agent) !== value) h.append(h.records.get(agent.session.id), 'team/mode', { enabled: value });
+      },
+    } });
+    const source = h.records.get('source');
+    h.append(source, 'team/mode', { enabled });
+    h.agents.get('source').followup(h.prompt('third'));
+    const before = structuredClone(source.events);
+    const third = source.events.findLast(event => event.type === 'user/message');
+    for (const body of [{ action: 'edit', eventSeq: third.seq, blockIndex: 0, text: 'edited third' }, { action: 'retry', turn: 3 }]) {
+      const result = await h.request('POST', { sessionId: 'source', ...body });
+      assert.equal(result.status, 200, JSON.stringify(result.body));
+      const child = h.records.get(result.body.sessionId);
+      assert.ok(child.events.slice(0, child.session.inheritedEventCount).some(event => event.type === 'team/mode'));
+      assert.equal(mode(h.agents.get(result.body.sessionId)), enabled);
+      assert.deepEqual(child.events.slice(child.session.inheritedEventCount).map(event => event.type),
+        [...enabled ? ['team/mode'] : [], 'turn/start', 'user/message', 'turn/end']);
+    }
+    assert.deepEqual(source.events, before);
+  });
+}
+
+test('Team mode is not read from subagent sources or hosts without the mode API', async () => {
+  const unowned = { isEnabled() { throw new Error('agent has no active runtime owner'); }, setEnabled() { throw new Error('unreachable'); } };
+  for (const [agentTeams, origin] of [[{}, undefined], [unowned, 'subagent']]) {
+    const h = harness(true, false, { agentTeams });
+    h.records.get('source').session.header.origin = origin;
+    const result = await h.request('POST', { action: 'retry', sessionId: 'source', turn: 1 });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+  }
+});
 
 test('tree cache sees new live events without re-snapshotting an unchanged log', async () => {
   const h = harness(true);

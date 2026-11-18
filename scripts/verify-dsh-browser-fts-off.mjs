@@ -6,7 +6,7 @@ import { launchQA, settleTree } from './browser-qa-utils.mjs';
 const qa = await launchQA('sidebar-fts-off');
 const { page, out, origin } = qa;
 const family = JSON.parse(await readFile(join(out, 'family.json'), 'utf8'));
-const { root, child, sibling, nested, retry } = family;
+const { root, child, sibling, nested, retry, copy } = family;
 const evidence = { source: process.env.DSH_QA_SHA, checks: [], errors: qa.errors, httpErrors: qa.httpErrors };
 async function check(name, details = {}) { evidence.checks.push({ name, ...details }); console.log(`PASS ${name}`); }
 const active = () => page.evaluate(() => { const l=window.__qa.ctx.get('sessions').list.getSnapshot();return l.ids.find(id=>l.byId[id]?.retainedBy?.mainView>0); });
@@ -39,7 +39,7 @@ try {
   assert.equal(tree.versions.find(v=>v.sessionId===nested).parentSessionId,child);
   assert.equal(tree.versions.find(v=>v.sessionId===nested).targetTurn,2);
   await check('second restart restores nested edits and retry version markers');
-  await rename(child,'Live: two images');await rename(sibling,'Live: two images');
+  await rename(child,'Live: two images');await rename(sibling,'Live: two images');await rename(copy,'Native independent copy');
   for(const remember of [false,true]) {
     await preferences(true,remember);await open(sibling);await search('Live: two images');
     const match=rows().filter({has:page.getByText('Live: two images',{exact:true})}).filter({hasText:'Message Edit acceptance'});

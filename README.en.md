@@ -5,7 +5,7 @@ English | [简体中文](README.md)
 [![npm](https://img.shields.io/npm/v/dsh-plugin-message-edit?color=cb3837&logo=npm)](https://www.npmjs.com/package/dsh-plugin-message-edit)
 [![CI](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SpookySandwich/dsh-plugin-message-edit/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.4-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
+[![dsh](https://img.shields.io/badge/dsh-0.2.2--rc.5-4b8dff)](https://github.com/deepseek-ai/deepseek-harness)
 [![stars](https://img.shields.io/github/stars/SpookySandwich/dsh-plugin-message-edit?style=flat&label=stars)](https://github.com/SpookySandwich/dsh-plugin-message-edit/stargazers)
 
 Edit a message you already sent and the conversation **rewinds and branches** from that point, the way ChatGPT, Claude and DeepSeek all do it. The old version is not overwritten — a `‹ 2/4 ›` counter appears under the bubble, and a Versions tab draws the whole tree.
@@ -20,7 +20,7 @@ No matter how deeply conversations diverge or how many times prompts are edited,
 
 ## What it does
 
-- **Edit and branch.** Revise a past prompt and send: a new branch regenerates from the full context *before* that turn. This is a true rewind, not a fork that continues from the end.
+- **Edit and branch.** Revise a past prompt and send: a new branch regenerates from the full context *before* that turn. This is a true rewind, not a fork that continues from the end. The branch keeps the conversation's model, reasoning effort, agent preset and **agent teamwork** setting.
 - **Version counter.** When a message has alternatives, `‹ n/m ›` appears beneath it. The arrows move between them instantaneously.
 - **Version tree.** A **Versions** tab lays the branches out as a graph you can pan, zoom and drag. The current path is highlighted; click any node to jump to that conversation.
 - **Zero-flicker instant switching.** Family-aware SWR client caching enables 0ms version switching and graph navigation without indicator flicker or loading delays.
@@ -32,7 +32,7 @@ No matter how deeply conversations diverge or how many times prompts are edited,
 
 ## Interface style
 
-In **Settings → Message editing**, enable **Group versions into one sidebar entry** to show an original conversation and its recorded edit/retry version family as a single sidebar row, including in search results. This option is **off by default** to preserve the existing list behavior.
+In **Settings → Message Edit**, enable **Group versions into one sidebar entry** to show an original conversation and its recorded edit/retry version family as a single sidebar row, including in search results. This option is **off by default** to preserve the existing list behavior.
 
 - **Scope and lineage.** Each recorded edit/version family collapses to its original root row while all branches remain accessible in the **Versions** tab and `‹ n/m ›` bubble switcher. Native independent conversation copies (such as **Branch into a new conversation** in DSH `0.2.2-rc.1`, which deliberately omits parent lineage) have no recorded parentage and remain separate root entries. Orphan branches whose parent is missing remain visible, and subagents are never merged into ordinary conversation versions.
 - **Root ownership and aggregated activity.** The grouped row retains the original root session's actual title, workspace membership, pin state, and archive state. Pinning or archiving the grouped row acts on the root session only (it never batch-archives, deletes, or rewrites family branches). Latest activity timestamps, running states, and running subagent counts (`runningChildCount`) are aggregated across the family, and viewing any branch highlights the shared row.
@@ -86,7 +86,7 @@ For technical details and developer guides, see:
 
 ## Compatibility
 
-Unreleased: Support official DSH `0.2.2-rc.4` by admitting it explicitly in the declared host ranges, while retaining all previously supported hosts. Users can still edit or retry prompts whose turns ended in `CONTENT_REFUSED`; branching keeps the correct turn boundary, and retained failed-attempt output stays outside successful answer history. No plugin runtime changes are required. Official DSH `0.2.2-rc.4` requires Node `>=24.9.0`. See the [unreleased notes](.github/release-notes/unreleased.md) for validation details.
+Unreleased: Support official DSH `0.2.2-rc.4` and `0.2.2-rc.5` by admitting them explicitly in the declared host ranges, while retaining all previously supported hosts; neither needs a plugin runtime change. Users can still edit or retry prompts whose turns ended in `CONTENT_REFUSED`; branching keeps the correct turn boundary, and retained failed-attempt output stays outside successful answer history. Editing or retrying a message now keeps the conversation's **agent teamwork** mode, which DSH otherwise turns off in every new session ([#13](https://github.com/SpookySandwich/dsh-plugin-message-edit/issues/13), reported by [@Arkos123](https://github.com/Arkos123)); the branch's own task board and teammates start empty. Official DSH `0.2.2-rc.4` and `0.2.2-rc.5` require Node `>=24.9.0`. See the [unreleased notes](.github/release-notes/unreleased.md) for validation details.
 
 Version `1.6.1`: Support official DSH `0.2.2-rc.3`. Editing or retrying imported history without a live agent now uses DSH's current default model when no `request/header` exists; native histories retain their recorded model and controls. Branches without a recorded agent preset resolve and mount DSH's configured default, preserving its persona, instructions and tools even after an imported chat gains native turns. File cards in both native and imported messages are passed to the host content renderer alongside images, including metadata-only files. The compatibility range admits `0.2.2-rc.3` explicitly and continues to exclude untested `0.2.2-rc.2` and future prereleases.
 
@@ -108,7 +108,7 @@ Version `1.2.0`: Unarchive a version through `workspaceRegistry.unarchiveSession
 
 Version `1.1.0`: Fix seeded edit/retry creation, clear inherited pending input before publication, identify version markers by session ownership, preserve reasoning effort, and read persisted branches through disposable session observations.
 
-The declared host range is `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.3 || 0.2.2-rc.4`; official dsh `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, and `0.2.2-rc.4` satisfy it. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/pr12-round2-actionable-status-2026-11-07.md) ([runtime matrix](.github/reviews/pr12-current-runtime-2026-11-07.md)).
+The declared host range is `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5`; official dsh `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, `0.2.2-rc.4`, and `0.2.2-rc.5` satisfy it. Keep the previous plugin release on older DSH. [Validation record](.github/reviews/pr12-round2-actionable-status-2026-11-07.md) ([runtime matrix](.github/reviews/pr12-current-runtime-2026-11-07.md)).
 
 Install published versions from [npm](https://www.npmjs.com/package/dsh-plugin-message-edit). To test the current source, run `npm ci` and `npm pack`, then `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.6.1.tgz`. See the [release procedure](.github/RELEASING.md) for publication checks.
 
@@ -117,7 +117,7 @@ plugin loading, images, edit/retry, nested branches, and restored sessions. Mode
 responses use a local test adapter; remote model services were not exercised.
 
 The compatibility layer retains the older `events` / `seedLength` interfaces,
-covered by automated tests. Current source targets official dsh `0.2.2-rc.4`.
+covered by automated tests. Current source targets official dsh `0.2.2-rc.5`.
 Restart DSH after updating the plugin.
 
 Coexists with [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream) and [dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout).
