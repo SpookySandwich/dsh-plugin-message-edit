@@ -42,8 +42,8 @@ async function fold(value) {
   await page.getByRole('button', { name: 'Close', exact: true }).click();
 }
 async function post(path, body) {
-  const response = await fetch(origin + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-  const result = await response.json(); assert.equal(response.status, 200, JSON.stringify(result)); return result;
+  const response = await page.request.post(origin + path, { data: body });
+  const result = await response.json(); assert.equal(response.status(), 200, JSON.stringify(result)); return result;
 }
 async function uiEdit(text, index) {
   await page.getByRole('button', { name: 'Edit message', exact: true }).nth(index).click(); await page.locator('textarea').fill(text);
@@ -69,7 +69,7 @@ try {
   await page.evaluate(() => { const qa = window.__qa, s = qa.ctx.get('sessions'), original = s.search.bind(s); qa.done = 0;
     s.search = async (...args) => { try { return await original(...args); } finally { qa.done++; } }; });
   if (!resume) {
-  const before = await (await fetch(origin + '/qa/state')).json();
+  const before = await (await page.request.get(origin + '/qa/state')).json();
   assert.ok(before.sessions.find(s => s.header.id === child && s.header.isSeeded));
   assert.equal(before.sessions.find(s => s.header.id === other).live, false);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('dsh-plugin-message-tree:prefs')).foldSidebar), true);
@@ -90,7 +90,7 @@ try {
   await page.getByRole('button', { name: 'Edit message', exact: true }).nth(1).waitFor();
   nested = await uiEdit('NestedOnlyMaple edited second turn.', 1);
   family.nested = nested;
-  const tree = await (await fetch(origin + '/message-tree?sessionId=' + nested)).json();
+  const tree = await (await page.request.get(origin + '/message-tree?sessionId=' + nested)).json();
   assert.equal(tree.versions.find(v => v.sessionId === nested).targetTurn, 2);
   assert.equal(tree.versions.find(v => v.sessionId === nested).parentSessionId, child);
   await check('UI nested edit after restart retains turn-two lineage', { nested });

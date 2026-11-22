@@ -8,22 +8,30 @@ const phase = process.argv[3];
 assert.ok(phase === undefined || phase === 'fresh' || phase === 'restart', 'Phase must be fresh or restart');
 const url = new URL(base);
 assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname), 'Use a local acceptance server');
+const launch = new URL(process.argv[4] ?? base);
+assert.equal(launch.origin, url.origin, 'The launch URL must belong to the local acceptance server');
+const auth = await fetch(launch, { redirect: 'manual' });
+const cookie = auth.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
+function request(path, options = {}) {
+  return fetch(`${url.origin}${path}`, { ...options, headers: { ...options.headers, cookie }, redirect: 'error' });
+}
 async function state() {
-  const response = await fetch(`${base}/qa/state`);
+  const response = await request('/qa/state');
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
   return result;
 }
 async function post(body) {
-  const response = await fetch(`${base}/message-tree`, {
+  const response = await request('/message-tree', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
   });
   const result = await response.json();
   assert.equal(response.status, 200, JSON.stringify(result));
   return result;
 }
-const team = await fetch(`${base}/qa/team`, { method: 'POST', headers: { 'content-type': 'application/json' },
+const team = await request('/qa/team', { method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ sessionId: 'session-qa-live' }) });
+assert.ok([200, 404].includes(team.status), `Team fixture returned HTTP ${team.status}`);
 const teamHost = team.status === 200;
 const teamMode = session => session.events.findLast(event => event.type === 'team/mode'
   && event.seq >= session.inheritedEventCount)?.data.enabled === true;
@@ -42,6 +50,23 @@ const persistedBranches = before.sessions.filter(session => session.header.isSee
 const persistedBranch = persistedBranches.find(teamMode) ?? persistedBranches[0];
 if (phase === 'restart') assert.ok(persistedBranch, 'Restart must restore a previously persisted seeded branch');
 if (phase === 'restart' && teamHost) assert.ok(teamMode(persistedBranch), 'A branch keeps its Team mode across restart');
+if (phase === 'restart') {
+  for (const id of ['session-qa-live', 'session-qa-cold']) {
+    const root = before.sessions.find(session => session.header.id === id);
+    const edited = persistedBranches.find(session => session.header.parentSession === id &&
+      session.events.some(event => isUser(event) && event.data.content[0]?.text === 'Parent-only turn after the nested edit.'));
+    assert.ok(edited, `The edited parent of ${id} must restore its subsequent turn`);
+    const nested = persistedBranches.find(session => session.header.parentSession === edited.header.id);
+    assert.ok(nested, 'Restore the nested edit under its selected parent');
+    const users = nested.events.filter(isUser);
+    assert.deepEqual(users.map(event => event.data.content[0].text), ['Edited in real DSH; retain both images.', 'Nested turn-two edit.']);
+    assert.deepEqual(users[0].data.content.slice(1), root.events.find(isUser).data.content.slice(1));
+    const marker = nested.events[nested.inheritedEventCount - 1];
+    assert.equal(marker.data.sessionId, nested.header.id);
+    assert.equal(marker.data.effect.targetTurn, 2);
+    assert.equal(teamMode(nested), teamMode(edited));
+  }
+}
 if (phase === 'fresh') assert.equal(persistedBranch, undefined, 'Fresh acceptance must start without old branches');
 if (persistedBranch) {
   const marker = persistedBranch.events.find(event => event.type === 'message-tree/version' && event.data.sessionId === persistedBranch.header.id);
@@ -73,14 +98,14 @@ for (const id of ['session-qa-live', 'session-qa-cold']) {
   assert.deepEqual(preserved.slice(0, source.events.length), source.events);
   assert.equal(preserved.filter(isUser).length, 2);
   await assertTeamModeCarried(id, result.sessionId);
-  const treeResponse = await fetch(`${base}/message-tree?sessionId=${result.sessionId}`);
+  const treeResponse = await request(`/message-tree?sessionId=${result.sessionId}`);
   assert.equal(treeResponse.status, 200);
   const tree = await treeResponse.json();
   assert.equal(tree.versions.find(version => version.sessionId === result.sessionId).targetTurn, 1);
   const retried = await post({ action: 'retry', sessionId: result.sessionId, turn: 1, stopPrevious: true });
   const retriedState = await state();
   assert.equal(retriedState.sessions.find(session => session.header.id === retried.sessionId).header.parentSession, id);
-  const continuation = await fetch(`${base}/qa/followup`, {
+  const continuation = await request('/qa/followup', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sessionId: result.sessionId, text: 'A later turn after the first branch.' }),
   });
@@ -90,11 +115,14 @@ for (const id of ['session-qa-live', 'session-qa-cold']) {
   const nested = await post({ action: 'edit', sessionId: result.sessionId, eventSeq: laterUser.seq,
     blockIndex: 0, text: 'Nested turn-two edit.', stopPrevious: true });
   await state();
-  const nestedTree = await (await fetch(`${base}/message-tree?sessionId=${nested.sessionId}`)).json();
+  const nestedTree = await (await request(`/message-tree?sessionId=${nested.sessionId}`)).json();
   const nestedVersion = nestedTree.versions.find(version => version.sessionId === nested.sessionId);
   assert.equal(nestedVersion.targetTurn, 2, 'The inherited turn-1 marker must not hide the new turn-2 marker');
   assert.equal(nestedVersion.parentSessionId, result.sessionId);
   await assertTeamModeCarried(result.sessionId, nested.sessionId);
+  const growth = await request('/qa/followup', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sessionId: result.sessionId, text: 'Parent-only turn after the nested edit.' }) });
+  assert.equal(growth.status, 200);
   console.log(JSON.stringify({ source: id, sourceWasLive: source.live, child: result.sessionId, teamMode: teamHost && teamMode(source),
     result: 'edit, images, local model reply, source preservation, tree, sibling retry, nested branch passed' }));
 }
@@ -111,11 +139,8 @@ if (process.env.DSH_QA_IMPORT === '1') {
     const image = await sharp({ create: { width: 80, height: 40, channels: 3, background: '#2563eb' } }).png().toBuffer();
     const workspace = before.workspaces.find(workspace => workspace.sessionIds.includes('session-qa-live'));
     assert.ok(workspace);
-    // The official importer is owner-only; bootstrap this runner's local cookie.
-    const auth = await fetch(process.argv[4] ?? base, { redirect: 'manual' });
-    const cookie = auth.headers.getSetCookie().map(value => value.split(';')[0]).join('; ');
-    const upload = await fetch(`${base}/api/deepseek-chat-import/archive?workspaceId=${encodeURIComponent(workspace.id)}`, {
-      method: 'POST', headers: { 'content-type': 'application/octet-stream', cookie },
+    const upload = await request(`/api/deepseek-chat-import/archive?workspaceId=${encodeURIComponent(workspace.id)}`, {
+      method: 'POST', headers: { 'content-type': 'application/octet-stream' },
       body: zipSync(deepseekExportEntries(image)),
     });
     assert.equal(upload.status, 200);
@@ -150,12 +175,12 @@ if (process.env.DSH_QA_IMPORT === '1') {
     assert.equal(child.header.agentPreset, 'standard', 'Imported branches must record the configured default preset');
     assert.equal(child.header.cwd, source.header.cwd);
     assert.ok(after.workspaces.some(workspace => workspace.sessionIds.includes(id) && workspace.sessionIds.includes(child.header.id)));
-    const request = child.events.findLast(event => event.type === 'request/header').data.header;
-    const tools = request.tools.map(tool => tool.name);
+    const header = child.events.findLast(event => event.type === 'request/header').data.header;
+    const tools = header.tools.map(tool => tool.name);
     for (const name of ['read', 'write', 'edit', 'grep', 'glob', 'web_fetch', 'todo_write', 'subagent', 'workflow']) {
       assert.ok(tools.includes(name), `Default preset tool ${name} must be available to imported ${action} turn ${turn}`);
     }
-    const route = request.config;
+    const route = header.config;
     assert.equal(route.provider, 'qa-local');
     assert.equal(route.model, 'qa-model');
     assert.equal(route.reasoningEffort, 'high');
@@ -169,7 +194,7 @@ if (process.env.DSH_QA_IMPORT === '1') {
     assert.ok(preserved.events.slice(source.events.length).every(event =>
       ['session/end-seed', 'permission/preset', 'sandbox/mode', 'approval/policy'].includes(event.type)));
     assert.equal(preserved.events.some(event => event.type === 'request/header'), false);
-    const tree = await (await fetch(`${base}/message-tree?sessionId=${result.sessionId}`)).json();
+    const tree = await (await request(`/message-tree?sessionId=${result.sessionId}`)).json();
     assert.equal(tree.versions.find(version => version.sessionId === child.header.id).targetTurn, turn);
     assert.equal(tree.versions.find(version => version.sessionId === id).targetTurn, undefined);
   }

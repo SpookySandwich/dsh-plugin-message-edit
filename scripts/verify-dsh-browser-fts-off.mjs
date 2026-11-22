@@ -33,9 +33,9 @@ try {
   assert.equal(preflight.ok,false);assert.match(JSON.stringify(preflight),/SESSION_QUERY_SEARCH_DISABLED|search.disabled|search is disabled/i);
   await check('official default content search is disabled',{preflight});
   await page.evaluate(()=>{const qa=window.__qa,s=qa.ctx.get('sessions'),f=s.search.bind(s);qa.done=0;s.search=async(...args)=>{try{return await f(...args);}finally{qa.done++;}};});
-  const state=await(await fetch(origin+'/qa/state')).json();
+  const state=await(await page.request.get(origin+'/qa/state')).json();
   for(const id of [child,nested,retry])assert.ok(state.sessions.find(s=>s.header.id===id)?.events.some(e=>e.type==='message-tree/version'&&e.data.sessionId===id));
-  const tree=await(await fetch(origin+'/message-tree?sessionId='+nested)).json();
+  const tree=await(await page.request.get(origin+'/message-tree?sessionId='+nested)).json();
   assert.equal(tree.versions.find(v=>v.sessionId===nested).parentSessionId,child);
   assert.equal(tree.versions.find(v=>v.sessionId===nested).targetTurn,2);
   await check('second restart restores nested edits and retry version markers');

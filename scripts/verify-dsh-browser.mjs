@@ -9,7 +9,7 @@ import { launchQA, settleTree } from './browser-qa-utils.mjs';
 const qa = await launchQA('sidebar-current');
 const { page, out, origin } = qa;
 const host = JSON.parse(await readFile(join(qa.home, 'process.json'), 'utf8')).version;
-const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.4', '0.2.2-rc.5'].includes(host);
+const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.4', '0.2.2-rc.5', '0.2.3-alpha.1'].includes(host);
 const evidence = { source: process.env.DSH_QA_SHA, host, browser: qa.browser.version(), checks: [], errors: qa.errors, httpErrors: qa.httpErrors };
 const rows = () => page.locator('[class*="_searchResultRow"]');
 const row = id => page.locator(`[data-row-key="session:${id}"]`);
@@ -160,9 +160,8 @@ try {
       qa.measure = { calls: qa.searchCalls, changes: qa.catalogChanges, samples: 0, missing: 0 };
       qa.timer = setInterval(() => { qa.measure.samples++; if (document.querySelectorAll('[class*="_searchResultRow"]').length !== 1) qa.measure.missing++; }, 10);
     });
-    const response = await fetch(`${origin}/qa/followup`, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionId: root, text: `QA_STREAM_${fold} real background activity` }) });
-    assert.equal(response.status, 200);
+    const response = await page.request.post(`${origin}/qa/followup`, { data: { sessionId: root, text: `QA_STREAM_${fold} real background activity` } });
+    assert.equal(response.status(), 200);
     const result = await page.evaluate(() => { const qa = window.__qa; clearInterval(qa.timer); return { samples: qa.measure.samples,
       missing: qa.measure.missing, extraSearches: qa.searchCalls - qa.measure.calls, catalogChanges: qa.catalogChanges - qa.measure.changes }; });
     assert.ok(result.samples > 100); assert.equal(result.missing, 0); assert.equal(result.extraSearches, 0); assert.ok(result.catalogChanges > 0);
@@ -194,7 +193,7 @@ try {
     assert.ok(importedId, JSON.stringify(progress));
     await page.getByText('Imported 1 session into the Message Edit acceptance workspace.', { exact: true }).waitFor();
     await page.getByRole('button', { name: 'Done', exact: true }).click();
-    const state = await (await fetch(`${origin}/qa/state`)).json();
+    const state = await (await page.request.get(`${origin}/qa/state`)).json();
     const imported = state.sessions.find(s => s.header.id === importedId);
     assert.ok(imported);
     assert.equal(imported.live, false);

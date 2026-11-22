@@ -232,6 +232,7 @@ function sidebarStatuses(statuses, list, attention, workspaces) {
     const flags = attention.get(root);
     grouped.set(root, { ...grouped.get(root),
       completionUnread: !!flags?.completed,
+      completionFailed: statuses.get(flags?.completed)?.completionFailed === true,
       pendingInteraction: flags?.pending?.interaction,
     });
   }

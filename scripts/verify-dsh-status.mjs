@@ -15,10 +15,10 @@ const active = () => page.evaluate(() => {
   return l.ids.find(id => l.byId[id]?.retainedBy?.mainView > 0);
 });
 const mainIs = id => page.waitForFunction(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id]?.retainedBy?.mainView > 0, id);
-const status = id => page.evaluate(id => window.__qa.ctx.get('uiSession').sessionStatus.getSnapshot().get(id), id);
+const status = id => page.evaluate(id => window.__qa.status.getSnapshot().get(id), id);
 async function fixture(action, sessionId) {
-  const response = await fetch(origin + '/qa/sidebar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action, sessionId }) });
-  const result = await response.json(); assert.equal(response.status, 200, JSON.stringify(result)); return result;
+  const response = await page.request.post(origin + '/qa/sidebar', { data: { action, sessionId } });
+  const result = await response.json(); assert.equal(response.status(), 200, JSON.stringify(result)); return result;
 }
 async function open(id) {
   await page.evaluate(id => window.__qa.ctx.get('uiWorkspace').openSession(id), id);
@@ -47,10 +47,9 @@ async function edit(text) {
   return result.sessionId;
 }
 async function followup(id, label) {
-  const response = await fetch(origin + '/qa/followup', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId: id, text: `QA_STREAM_status_${label}` }) });
-  assert.equal(response.status, 200, await response.text());
-  await page.waitForFunction(id => window.__qa.ctx.get('uiSession').sessionStatus.getSnapshot().get(id)?.completionUnread === true, id);
+  const response = await page.request.post(origin + '/qa/followup', { data: { sessionId: id, text: `QA_STREAM_status_${label}` } });
+  assert.equal(response.status(), 200, await response.text());
+  await page.waitForFunction(id => window.__qa.status.getSnapshot().get(id)?.completionUnread === true, id);
 }
 async function check(name, details = {}) { evidence.checks.push({ name, ...details }); console.log(`PASS ${name}`); }
 try {
@@ -70,18 +69,36 @@ try {
     for (const id of [root, child, sibling, other]) await open(id);
     await followup(child, label);
     const target = fold ? root : child;
-    await row(target).getByText('Completed', { exact: true }).waitFor();
+    await row(target).getByText(/^(Completed|Unread)$/).waitFor();
     await row(target).click();
     await page.waitForFunction(other => {
       const l = window.__qa.ctx.get('sessions').list.getSnapshot();
       return l.ids.some(id => id !== other && l.byId[id]?.retainedBy?.mainView > 0);
     }, other);
-    const observed = { label, opened: await active(), childStatus: await status(child), rowCompleted: await row(target).getByText('Completed', { exact: true }).count() };
+    const observed = { label, opened: await active(), childStatus: await status(child), rowCompleted: await row(target).getByText(/^(Completed|Unread)$/).count() };
     evidence.lastObservation = observed;
     assert.equal(observed.opened, child, 'Completed family row must open the unread child');
-    await page.waitForFunction(id => !window.__qa.ctx.get('uiSession').sessionStatus.getSnapshot().get(id)?.completionUnread, child);
-    await row(target).getByText('Completed', { exact: true }).waitFor({ state: 'hidden' });
+    await page.waitForFunction(id => !window.__qa.status.getSnapshot().get(id)?.completionUnread, child);
+    await row(target).getByText(/^(Completed|Unread)$/).waitFor({ state: 'hidden' });
     await check(`completion leads to source and native read clears it: ${label}`, { ...observed, after: await status(child) });
+  }
+  if (evidence.host === '0.2.3-alpha.1') {
+    await prefs(true, false);
+    for (const id of [root, child, sibling, other]) await open(id);
+    const failure = await page.request.post(origin + '/qa/followup', { data: { sessionId: child, text: 'QA_FAILED_COMPLETION' } });
+    assert.equal(failure.status(), 200);
+    await row(root).getByText('Run failed', { exact: true }).first().waitFor();
+    assert.equal((await status(child)).completionFailed, true);
+    await page.screenshot({ path: join(out, `${name}-failed-child.png`) });
+    for (const unread of [true, false]) {
+      await row(root).click({ button: 'right' });
+      await page.getByRole('menuitem', { name: unread ? 'Mark as unread' : 'Mark as read' }).click();
+      await page.waitForFunction(({ root, unread }) => window.__qa.status.getSnapshot().get(root)?.completionUnread === unread, { root, unread });
+      assert.equal((await status(child)).completionUnread, true);
+    }
+    await row(root).click(); await mainIs(child);
+    await page.waitForFunction(id => !window.__qa.status.getSnapshot().get(id)?.completionUnread, child);
+    await check('failed completion opens its child and native read-menu actions mark only the root');
   }
   for (const remember of [false, true]) {
     await prefs(true, remember);
@@ -90,11 +107,11 @@ try {
     await row(root).click();
     await page.waitForFunction(ids => ids.some(id => window.__qa.ctx.get('sessions').list.getSnapshot().byId[id]?.retainedBy?.mainView > 0), [child, sibling]);
     const first = await active(), remaining = first === child ? sibling : child;
-    await page.waitForFunction(id => !window.__qa.ctx.get('uiSession').sessionStatus.getSnapshot().get(id)?.completionUnread, first);
+    await page.waitForFunction(id => !window.__qa.status.getSnapshot().get(id)?.completionUnread, first);
     assert.equal((await status(remaining)).completionUnread, true, 'opening one version must not mark its sibling read');
-    await row(root).getByText('Completed', { exact: true }).waitFor();
+    await row(root).getByText(/^(Completed|Unread)$/).waitFor();
     await row(root).click(); await mainIs(remaining);
-    await row(root).getByText('Completed', { exact: true }).waitFor({ state: 'hidden' });
+    await row(root).getByText(/^(Completed|Unread)$/).waitFor({ state: 'hidden' });
     await check(`multiple completions are visited individually remember=${remember}`, { first, remaining });
     await open(sibling); await open(other); await row(root).click(); await mainIs(remember ? sibling : root);
     await check(`no actionable status restores ordinary remember=${remember}`);
@@ -120,13 +137,13 @@ try {
     await page.screenshot({ path: join(out, `${name}-approval-${remember}.png`) });
     await page.getByRole('button', { name: 'Reject', exact: true }).click();
     await page.waitForFunction(id => {
-      const state = window.__qa.ctx.get('uiSession').sessionStatus.getSnapshot().get(id);
+      const state = window.__qa.status.getSnapshot().get(id);
       return !state?.pendingInteraction && !state?.running;
     }, child);
     const record = (await fixture('approval-status', child)).find(record => record.sessionId === child);
     assert.equal(record.outcome, 'rejected'); assert.equal(record.settled, true);
     await row(root).click(); await mainIs(sibling);
-    await row(root).getByText('Completed', { exact: true }).waitFor({ state: 'hidden' });
+    await row(root).getByText(/^(Completed|Unread)$/).waitFor({ state: 'hidden' });
     await check(`real pending approval opens before unread sibling and native rejection settles it remember=${remember}`, { record });
   }
   await prefs(true, true);
@@ -135,7 +152,7 @@ try {
   await row(root).getByText('Waiting for approval', { exact: true }).waitFor();
   await row(root).click(); await mainIs(root);
   await page.getByRole('button', { name: 'Reject', exact: true }).click();
-  await page.waitForFunction(id => !window.__qa.ctx.get('uiSession').sessionStatus.getSnapshot().get(id)?.running, root);
+  await page.waitForFunction(id => !window.__qa.status.getSnapshot().get(id)?.running, root);
   assert.equal(await active(), root, 'bubble remember must not undo root approval navigation');
   await check('root approval remains on the root with a remembered sibling');
   assert.deepEqual(qa.errors, []); assert.deepEqual(qa.httpErrors, []);

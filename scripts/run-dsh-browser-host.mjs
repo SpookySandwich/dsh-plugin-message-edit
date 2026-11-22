@@ -18,6 +18,7 @@ for (const [source, name] of [[join(modules, '@deepseek-ai'), '@deepseek-ai'], [
   catch (error) { if (error.code !== 'EEXIST') throw error; }
 }
 await writeFile(join(profile, 'package.json'), JSON.stringify({ name: 'message-edit-browser-qa', private: true,
+  dependencies: { 'dsh-plugin-message-edit': `link:${root}` },
   dsh: { profile: { bundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-plugin-message-edit',
     ...(chatImport ? ['@deepseek-ai/dsh-deepseek-chat-import'] : [])] } } }));
 for (const name of ['dsh-acceptance.mjs', 'dsh-browser-acceptance.mjs'])

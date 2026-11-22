@@ -21,6 +21,7 @@ export async function apply(ctx) {
   };
   await baseApply(ctx, { beforeReply: async (message, signal) => {
     const text = message?.content.find(block => block.type === 'text')?.text || '';
+    if (text === 'QA_FAILED_COMPLETION') throw new Error('Offline QA failed completion');
     if (!text.startsWith('QA_APPROVAL_')) return;
     const id = text.slice('QA_APPROVAL_'.length);
     const agent = owned(id);

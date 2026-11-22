@@ -80,7 +80,7 @@ function harness(modern, resumed = false, { imported = false, defaultSelection, 
         const record = records.get(id);
         if (!record) throw new Error('not found');
         return { [modern ? 'session' : 'header']: record.session.header, events: structuredClone(record.events),
-          ...(modern ? { inheritedEventCount: record.session.inheritedEventCount } : {}) };
+          ...(modern ? { inheritedEventCount: record.session.inheritedEventCount, persistedEventCount: record.persistedEventCount } : {}) };
       },
     },
     agents: {
@@ -92,6 +92,9 @@ function harness(modern, resumed = false, { imported = false, defaultSelection, 
         return { agent: agentFor(record, agentOptions), async dispose() { record.live = false; agents.delete(resumeSessionId); } };
       },
       async create(options) {
+        const parent = records.get(options.meta.parentSession);
+        assert.equal(options.parentSource.sessionId, parent.session.id);
+        assert.deepEqual(options.seed.slice(0, options.parentSource.endSeq), parent.events.slice(0, options.parentSource.endSeq));
         creations.push(options);
         const record = makeSession(options.sessionId, structuredClone(options.seed), options.meta, options.inheritedEventCount);
         if (modern) {
@@ -273,8 +276,17 @@ for (const modern of [false, true]) {
     const version = tree.body.versions.find(entry => entry.sessionId === c);
     assert.equal(version.targetTurn, 2, 'Ignore the inherited turn-1 version marker');
     assert.equal(version.parentSessionId, b);
+    const prefixLength = target.seq - 1;
+    assert.deepEqual(h.creations.at(-1).parentSource, { sessionId: b, endSeq: prefixLength });
+    const parent = h.records.get(b);
+    parent.live = false;
+    parent.persistedEventCount = prefixLength - 1;
     const retried = await h.request('POST', { action: 'retry', sessionId: c, turn: 2, stopPrevious: true });
     assert.equal(retried.status, 200, JSON.stringify(retried.body));
+    const repeated = h.creations.at(-1);
+    assert.deepEqual(repeated.parentSource, { sessionId: b, endSeq: modern ? parent.persistedEventCount : prefixLength });
+    assert.deepEqual(repeated.seed.slice(0, prefixLength), parent.events.slice(0, prefixLength));
+    assert.equal(repeated.seed[prefixLength].data.sessionId, retried.body.sessionId);
     const d = h.records.get(retried.body.sessionId);
     assert.equal(d.session.header.parentSession, b, 'Repeated turn-2 versions are siblings');
     assert.equal(d.events.findLast(event => event.type === 'user/message').data.content[0].text, 'C');

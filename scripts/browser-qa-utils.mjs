@@ -1,5 +1,6 @@
 // Helpers for repeatable official Web acceptance with an owned Edge process.
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { readFile, appendFile, mkdir, writeFile } from 'node:fs/promises';
@@ -36,7 +37,8 @@ export async function launchQA(name) {
   context = await browser.newContext({ viewport: { width: 1360, height: 900 }, locale: 'en-US',
     ...(process.env.DSH_QA_STORAGE ? { storageState: process.env.DSH_QA_STORAGE } : {}) });
   // Observe the actual plugin context without replacing host stores/renderers.
-  await context.addInitScript(() => {
+  const splitStatus = existsSync(join(process.env.DSH_QA_MODULES, '@deepseek-ai/dsh-client-ui-session-status/package.json'));
+  await context.addInitScript(splitStatus => {
     let loader;
     Object.defineProperty(window, '__ModuleLoader__', {
       configurable: true,
@@ -49,8 +51,9 @@ export async function launchQA(name) {
             definition = { ...definition, factory: (...args) => {
               const plugin = factory(...args);
               const apply = plugin.apply;
-              return { ...plugin, apply(ctx, ...rest) {
-                window.__qa = { ctx };
+              const inject = splitStatus ? [...plugin.inject, 'uiSession', 'uiSession.sessionStatus'] : plugin.inject;
+              return { ...plugin, inject, apply(ctx, ...rest) {
+                window.__qa = { ctx, get status() { return ctx.get('uiSession')?.sessionStatus; } };
                 return apply(ctx, ...rest);
               } };
             } };
@@ -62,7 +65,7 @@ export async function launchQA(name) {
           set: load => { wrapped = wrap(load); } });
       },
     });
-  });
+  }, splitStatus);
   page = await context.newPage();
   page.on('pageerror', error => errors.push(String(error)));
   page.on('response', response => { if (response.status() >= 400) httpErrors.push({ url: new URL(response.url()).pathname, status: response.status() }); });

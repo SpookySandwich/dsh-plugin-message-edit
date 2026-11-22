@@ -105,7 +105,7 @@ To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit
 ### Optional real DSH acceptance
 
 `test/fixtures/dsh-acceptance.mjs` is an offline model adapter and live/cold
-session fixture for an installed official DSH `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, `0.2.2-rc.4`, or `0.2.2-rc.5` runtime (DSH `0.2.2` requires Node `>=24.9.0`; earlier hosts support Node `22.19+` or Node `24`). Mount it
+session fixture for an installed official DSH `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`, or `0.2.3-alpha.1` runtime (DSH `0.2.2` and later require Node `>=24.9.0`; earlier hosts support Node `22.19+` or Node `24`; the npm `0.2.3-alpha.1` package does not start, so build that one from its tag). Mount it
 only in a new temporary home whose name contains `message-edit-dsh-qa-`.
 Set `DSH_HOME` to that home and `DSH_QA_MODULES` to the official runtime's
 `node_modules` directory. Use a separate Web profile with the base/Web bundles,
@@ -115,8 +115,11 @@ this fixture at an existing user's DSH home.
 Once the isolated server prints its URL, run:
 
 ```bash
-node scripts/verify-dsh-acceptance.mjs http://127.0.0.1:61587
+node scripts/verify-dsh-acceptance.mjs http://127.0.0.1:61587 fresh "<printed launch URL>"
 ```
+
+Since DSH `0.2.3-alpha.1` the Web server authenticates plugin routes; the
+verifier exchanges the printed launch URL's token for the host's session cookie.
 
 The verifier exercises real HTTP edit/retry operations, local model execution,
 image retention, unchanged source messages, and nested branch markers. On hosts
@@ -136,6 +139,9 @@ official runtime's `node_modules` directory and run:
 ```bash
 node scripts/run-dsh-acceptance.mjs
 ```
+
+Set `DSH_QA_STORAGE_BACKEND=sqlite` to replace the JSONL session store with
+DSH's opt-in SQLite provider (`0.2.3-alpha.1` and later).
 
 The runner owns and removes a unique temporary home, boots the official CLI
 on an OS-selected port, runs the verifier, restarts the host, and repeats.

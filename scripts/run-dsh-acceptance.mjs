@@ -32,7 +32,16 @@ try {
       ...(chatImport ? ['@deepseek-ai/dsh-deepseek-chat-import'] : [])] } } }));
   // A fixture is a separate host-only entry, not a second client package source.
   await copyFile(join(root, 'test/fixtures/dsh-acceptance.mjs'), join(profile, 'fixture.mjs'));
-  await writeFile(join(profile, 'cordis.patch.yml'), '- insert:\n    - id: offline-qa\n      name: ./fixture.mjs\n' +
+  const sqlite = process.env.DSH_QA_STORAGE_BACKEND === 'sqlite';
+  const storagePatch = sqlite ? `- id: session-persistence-jsonl
+  disabled: true
+- insert:
+    - id: session-persistence-sqlite
+      name: '@deepseek-ai/dsh-session-persistence-sqlite'
+      config:
+        root: !!js dshHomePath('sessions')
+` : '';
+  await writeFile(join(profile, 'cordis.patch.yml'), storagePatch + '- insert:\n    - id: offline-qa\n      name: ./fixture.mjs\n' +
     '- id: agent-default-model\n  config:\n    provider: qa-local\n    model: qa-model\n    reasoningEffort: high\n');
   for (const phase of ['fresh', 'restart']) {
     let output = '';
@@ -62,6 +71,14 @@ try {
     clearTimeout(timeout);
     assert.equal(code, 0, `Acceptance failed (${phase}); host output:\n${output}`);
     await stop();
+    if (sqlite) {
+      const { DatabaseSync } = await import('node:sqlite');
+      const db = new DatabaseSync(join(home, 'sessions/.segments/sessions.sqlite'), { readOnly: true });
+      try {
+        const { forks } = db.prepare('SELECT count(*) AS forks FROM segments WHERE parent_segment_uuid IS NOT NULL').get();
+        assert.ok(forks > 0, 'SQLite branches must reference their parent prefix instead of copying it');
+      } finally { db.close(); }
+    }
   }
 } finally {
   await stop();

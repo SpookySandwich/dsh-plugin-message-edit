@@ -263,6 +263,22 @@ test('a grouped completion opens its unread source before the remembered sibling
   }
 });
 
+test('the failure indicator follows the session a grouped unread row opens', () => {
+  for (const failed of [true, false]) {
+    const h = setup();
+    h.statuses.set('root', { running: false, completionUnread: false, completionFailed: !failed });
+    h.statuses.set('child', { running: false, completionUnread: true, completionFailed: failed });
+    const props = h.render();
+    const row = props.useSessionStatus(s => s).get('root');
+    assert.equal(row.completionUnread, true);
+    assert.equal(row.completionFailed, failed);
+    props.open('root');
+    assert.deepEqual(h.opens, ['child']);
+    h.statuses.set('child', { running: false, completionUnread: false, completionFailed: false });
+    assert.equal(h.render().useSessionStatus(s => s).get('root').completionFailed, false);
+  }
+});
+
 test('pending interactions outrank unread completions and remain owned by their actual session', () => {
   for (const kind of ['approval', 'plan-review', 'question']) for (const rememberPath of [false, true]) {
     const h = setup({ foldSidebar: true, rememberPath });
