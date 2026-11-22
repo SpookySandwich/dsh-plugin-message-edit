@@ -9,7 +9,7 @@ import { launchQA, settleTree } from './browser-qa-utils.mjs';
 const qa = await launchQA('sidebar-current');
 const { page, out, origin } = qa;
 const host = JSON.parse(await readFile(join(qa.home, 'process.json'), 'utf8')).version;
-const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.4', '0.2.2-rc.5', '0.2.3-alpha.1'].includes(host);
+const nativeIdSearch = ['0.2.2-rc.1', '0.2.2-rc.3', '0.2.2-rc.4', '0.2.2-rc.5', '0.2.3-alpha.1', '0.2.3-alpha.2'].includes(host);
 const evidence = { source: process.env.DSH_QA_SHA, host, browser: qa.browser.version(), checks: [], errors: qa.errors, httpErrors: qa.httpErrors };
 const rows = () => page.locator('[class*="_searchResultRow"]');
 const row = id => page.locator(`[data-row-key="session:${id}"]`);
@@ -98,8 +98,11 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('[data-row-key="session:session-qa-live"]').length === 1);
   assert.equal(await row(child).count(), 0);
   assert.equal(await row(root).getAttribute('aria-selected'), 'true');
-  assert.equal(await page.locator('img[alt="red.png"]').count(), 1);
-  assert.equal(await page.locator('img[alt="blue.png"]').count(), 1);
+  for (const file of ['red.png', 'blue.png']) {
+    const thumbnail = page.getByRole('img', { name: file, exact: true });
+    await thumbnail.waitFor();
+    await thumbnail.evaluate(img => img.decode());
+  }
   await checkpoint('UI edit with two images immediately groups and selects original', { child });
   await open(root);
   const sibling = await edit('SiblingOnlyCedar a separate remembered version.');

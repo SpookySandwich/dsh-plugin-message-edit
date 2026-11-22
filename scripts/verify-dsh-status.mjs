@@ -82,7 +82,7 @@ try {
     await row(target).getByText(/^(Completed|Unread)$/).waitFor({ state: 'hidden' });
     await check(`completion leads to source and native read clears it: ${label}`, { ...observed, after: await status(child) });
   }
-  if (evidence.host === '0.2.3-alpha.1') {
+  if (['0.2.3-alpha.1', '0.2.3-alpha.2'].includes(evidence.host)) {
     await prefs(true, false);
     for (const id of [root, child, sibling, other]) await open(id);
     const failure = await page.request.post(origin + '/qa/followup', { data: { sessionId: child, text: 'QA_FAILED_COMPLETION' } });

@@ -49,12 +49,12 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        dsh: [0.2.0-rc.2, 0.2.1-rc.2, 0.2.1-rc.5, 0.2.2-rc.1, 0.2.2-rc.3, 0.2.2-rc.4, 0.2.2-rc.5]
+        dsh: [0.2.0-rc.2, 0.2.1-rc.2, 0.2.1-rc.5, 0.2.2-rc.1, 0.2.2-rc.3, 0.2.2-rc.4, 0.2.2-rc.5, 0.2.3-alpha.2]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '^24.22.3'
           cache: npm
       - run: npm ci
       - run: npm run build
@@ -64,3 +64,9 @@ jobs:
         run: node scripts/run-dsh-acceptance.mjs
         env:
           DSH_QA_MODULES: ${{ runner.temp }}/dsh-runtime/node_modules
+      - name: Verify SQLite forks and restart persistence
+        if: matrix.dsh == '0.2.3-alpha.2'
+        run: node scripts/run-dsh-acceptance.mjs
+        env:
+          DSH_QA_MODULES: ${{ runner.temp }}/dsh-runtime/node_modules
+          DSH_QA_STORAGE_BACKEND: sqlite

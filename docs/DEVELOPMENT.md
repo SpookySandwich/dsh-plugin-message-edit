@@ -78,7 +78,7 @@ fresh checkout before running tests (Node 22.19+ or Node 24; official DSH `0.2.2
 
 GitHub Actions runs these checks for pull requests and branch pushes, on
 Linux (Node 22 and 24) and Windows (Node 22), plus official DSH host acceptance
-(`0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, `0.2.2-rc.4`, and `0.2.2-rc.5` on Linux and Windows with Node 24). It also runs:
+(`0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`, and `0.2.3-alpha.2` on Linux and Windows with Node `^24.22.3`). It also runs:
 
 ```bash
 npm run check:package
@@ -105,8 +105,12 @@ To add new tests, edit [`test/tree.test.mjs`](file:///D:/dsh-plugin-message-edit
 ### Optional real DSH acceptance
 
 `test/fixtures/dsh-acceptance.mjs` is an offline model adapter and live/cold
-session fixture for an installed official DSH `0.2.0-rc.2`, `0.2.1-rc.2`, `0.2.1-rc.5`, `0.2.2-rc.1`, `0.2.2-rc.3`, `0.2.2-rc.4`, `0.2.2-rc.5`, or `0.2.3-alpha.1` runtime (DSH `0.2.2` and later require Node `>=24.9.0`; earlier hosts support Node `22.19+` or Node `24`; the npm `0.2.3-alpha.1` package does not start, so build that one from its tag). Mount it
-only in a new temporary home whose name contains `message-edit-dsh-qa-`.
+session fixture for the official hosts in the CI matrix above and `0.2.3-alpha.1`.
+DSH `0.2.3-alpha.2` requires Node `^24.22.3 || >=26.13.1`. The listed `0.2.2`
+hosts and `0.2.3-alpha.1` require Node `>=24.9.0`. Earlier hosts support Node
+`22.19+` or Node `24`. Build `0.2.3-alpha.1` from its tag because its npm package
+fails at startup. Mount the fixture only in a new temporary home whose name
+contains `message-edit-dsh-qa-`.
 Set `DSH_HOME` to that home and `DSH_QA_MODULES` to the official runtime's
 `node_modules` directory. Use a separate Web profile with the base/Web bundles,
 a built copy of this plugin, and a loader entry for the fixture. Never point

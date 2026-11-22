@@ -86,7 +86,7 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 ## 兼容性
 
-尚未发布：支持官方 DSH `0.2.3-alpha.1`。编辑与重试遵循 alpha 的分叉约定：向 DSH 提供父会话及双方共享的精确已存储历史，可选的 SQLite 会话存储因此引用该历史而不再复制。侧栏合并显示版本时，「运行出错」标记现在属于该行将打开的版本。该 alpha 要求 Node `>=24.9.0`。另在声明的宿主兼容范围中显式纳入官方 DSH `0.2.2-rc.4` 与 `0.2.2-rc.5`，继续支持此前所有已支持的宿主版本；两者均无需改动插件运行时代码。以 `CONTENT_REFUSED` 结束的轮次仍可编辑或重试；分支保留正确的轮次边界，保留的失败尝试输出不会进入成功回复历史。编辑或重试消息时，分支现在沿用该对话的**智能体团队协作**模式（DSH 默认在每个新会话中关闭该模式）（[#13](https://github.com/SpookySandwich/dsh-plugin-message-edit/issues/13)，由 [@Arkos123](https://github.com/Arkos123) 报告）；分支自己的任务板与队友从空开始。官方 DSH `0.2.2-rc.4` 与 `0.2.2-rc.5` 要求 Node `>=24.9.0`。验证详情见[未发布说明](.github/release-notes/unreleased.md)。
+尚未发布：支持官方 DSH `0.2.3-alpha.1` 与 `0.2.3-alpha.2`。编辑与重试遵循 alpha 的分叉约定：向 DSH 提供父会话及双方共享的精确已存储历史，可选的 SQLite 会话存储因此引用该历史而不再复制。侧栏合并显示版本时，「运行出错」标记现在属于该行将打开的版本。alpha.1 要求 Node `>=24.9.0`，alpha.2 要求 Node `^24.22.3 || >=26.13.1`。另在声明的宿主兼容范围中显式纳入官方 DSH `0.2.2-rc.4` 与 `0.2.2-rc.5`，继续支持此前所有已支持的宿主版本；两者均无需改动插件运行时代码。以 `CONTENT_REFUSED` 结束的轮次仍可编辑或重试；分支保留正确的轮次边界，保留的失败尝试输出不会进入成功回复历史。编辑或重试消息时，分支现在沿用该对话的**智能体团队协作**模式（DSH 默认在每个新会话中关闭该模式）（[#13](https://github.com/SpookySandwich/dsh-plugin-message-edit/issues/13)，由 [@Arkos123](https://github.com/Arkos123) 报告）；分支自己的任务板与队友从空开始。官方 DSH `0.2.2-rc.4` 与 `0.2.2-rc.5` 要求 Node `>=24.9.0`。验证详情见[未发布说明](.github/release-notes/unreleased.md)。
 
 版本 `1.6.1`：支持官方 DSH `0.2.2-rc.3`。编辑或重试没有活动智能体的导入历史时，若日志中不存在 `request/header`，则使用 DSH 当前默认模型；原生历史仍沿用已记录的模型与控制选项。源会话没有记录智能体预设时，分支会解析并挂载 DSH 配置的默认预设，保留其角色设定、指令与工具；导入会话追加原生轮次后同样适用。原生和导入消息中的文件卡片（包括仅有元数据的文件）与图片一起交由宿主内容渲染器显示。兼容范围显式纳入 `0.2.2-rc.3`，继续排除尚未验证的 `0.2.2-rc.2` 与后续预发布版本。
 
@@ -108,13 +108,13 @@ DSH 的会话是仅追加的事件日志，本身不支持会话内分支，因�
 
 版本 `1.1.0`：修复编辑/重试的 seed 边界，发布分支前清空继承的待发送输入，按会话身份识别版本标记，保留推理强度，并通过会话观察接口恢复持久分支。
 
-声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5 || 0.2.3-alpha.1`；官方 dsh `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5`、`0.2.2-rc.1`、`0.2.2-rc.3`、`0.2.2-rc.4`、`0.2.2-rc.5` 与 `0.2.3-alpha.1` 满足该范围。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/pr12-round2-actionable-status-2026-11-07.md)（[运行时矩阵](.github/reviews/pr12-current-runtime-2026-11-07.md)）。
+声明兼容范围为 `>=0.2.0-rc.2 <0.3.0-0 || 0.2.1-rc.2 || 0.2.1-rc.5 || 0.2.2-rc.1 || 0.2.2-rc.3 || 0.2.2-rc.4 || 0.2.2-rc.5 || 0.2.3-alpha.1 || 0.2.3-alpha.2`；官方 dsh `0.2.0-rc.2`、`0.2.1-rc.2`、`0.2.1-rc.5`、`0.2.2-rc.1`、`0.2.2-rc.3`、`0.2.2-rc.4`、`0.2.2-rc.5`、`0.2.3-alpha.1` 与 `0.2.3-alpha.2` 满足该范围。DSH `0.2.3-alpha.2` 要求 Node `^24.22.3 || >=26.13.1`。旧版 DSH 请保留上一插件版本。[验证记录](.github/reviews/pr12-round2-actionable-status-2026-11-07.md)（[运行时矩阵](.github/reviews/pr12-current-runtime-2026-11-07.md)）。
 
 已发布版本可从 [npm](https://www.npmjs.com/package/dsh-plugin-message-edit) 安装。测试当前源码时，先运行 `npm ci` 和 `npm pack`，再运行 `dsh plugin --profile desktop add ./dsh-plugin-message-edit-1.6.1.tgz`。发布完整性检查见 [发布流程](.github/RELEASING.md)。
 
 `1.1.0` 已在 DSH `0.1.5-rc.2` 的隔离 Web 环境验证：插件加载、图片显示、编辑与重试、深层分支，以及持久会话的恢复读取。模型回复使用本地测试实现，未调用远程模型服务。
 
-兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。当前源码对应官方 dsh `0.2.3-alpha.1`。更新插件后请重启 DSH。
+兼容层保留了旧版 `events` / `seedLength` 接口支持，并由自动测试覆盖。当前源码对应官方 dsh `0.2.3-alpha.2`。更新插件后请重启 DSH。
 
 可与 [dsh-plugin-smooth-stream](https://github.com/SpookySandwich/dsh-plugin-smooth-stream)、[dsh-plugin-rollout-scout](https://github.com/SpookySandwich/dsh-plugin-rollout-scout) 共存。
 
